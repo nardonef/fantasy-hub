@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment
+.env
+*.log
+
+# API generated files
+api/src/generated/
+api/certs/
+
+# iOS
+ios/FantasyHub.xcodeproj/xcuserdata/
+ios/DerivedData/
+ios/app-state-*/
+*.xcuserstate
+
+# Portfolio assets (excluded; screenshots available in docs/screenshots/)
+portfolio-screenshots/
+
+# macOS
+.DS_Store
