@@ -4,7 +4,12 @@ dist/
 
 # Environment
 .env
+*.env.bak
 *.log
+
+# Claude local settings (machine-specific)
+.claude/settings.local.json
+ios/.claude/
 
 # API generated files
 api/src/generated/
