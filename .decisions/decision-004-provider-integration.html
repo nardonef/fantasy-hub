@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 4: Provider Integration Strategy — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; max-width: 1200px; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .flow-container { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem; width: 100%; max-width: 280px; }
+    .flow-step { display: flex; align-items: center; gap: 10px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .flow-step.highlight { border-color: #6366f1; background: #eff6ff; color: #1d4ed8; }
+    .flow-step-number { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; flex-shrink: 0; }
+    .flow-step.highlight .flow-step-number { background: #6366f1; color: white; }
+    .flow-step-label { flex: 1; }
+    .flow-down-arrow { font-size: 1rem; color: #94a3b8; padding: 2px 0; text-align: center; }
+
+    .arch-diagram { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0.5rem; width: 100%; }
+    .arch-layer { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; width: 100%; }
+    .arch-box { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: center; min-width: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .arch-box.frontend { border-color: #7c3aed; color: #7c3aed; }
+    .arch-box.backend { border-color: #0891b2; color: #0891b2; }
+    .arch-box.database { border-color: #059669; color: #059669; }
+    .arch-box.service { border-color: #dc2626; color: #dc2626; }
+    .arch-box.infra { border-color: #64748b; color: #64748b; }
+    .arch-box.provider { border-color: #ea580c; color: #ea580c; }
+    .arch-arrow { font-size: 1rem; color: #94a3b8; text-align: center; }
+    .arch-note { font-size: 0.6rem; color: #94a3b8; text-align: center; font-style: italic; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 4 of 12</span>
+    <h1>Provider Integration Strategy</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      The heart of Fantasy League Hub is pulling data from Yahoo, ESPN, and Sleeper and making it feel like one unified experience. Each provider is different: Yahoo has an official OAuth API, ESPN has an unofficial API you authenticate via cookies, and Sleeper has a public read-only API with no auth needed. The question is how you architect the sync — do you build custom adapters for each, use an abstraction layer, batch everything in background jobs, or take a more event-driven approach? This decision affects how reliable syncing is, how fast new providers can be added, and how fresh the data stays.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Adapter Pattern + BullMQ -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Adapter Pattern + Job Queue</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box provider">Yahoo API</div>
+            <div class="arch-box provider">ESPN API</div>
+            <div class="arch-box provider">Sleeper API</div>
+          </div>
+          <div class="arch-arrow">↕ each has its own adapter</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">YahooAdapter</div>
+            <div class="arch-box backend">ESPNAdapter</div>
+            <div class="arch-box backend">SleeperAdapter</div>
+          </div>
+          <div class="arch-arrow">↓ all return unified types</div>
+          <div class="arch-layer">
+            <div class="arch-box frontend">Unified League Model</div>
+          </div>
+          <div class="arch-arrow">↓ scheduled via</div>
+          <div class="arch-layer">
+            <div class="arch-box service">BullMQ Job Queue</div>
+            <div class="arch-box infra">Redis</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer">
+            <div class="arch-box database">PostgreSQL (Prisma)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Build a typed adapter (a translation layer) for each provider that converts their specific data format into your unified model. Each adapter implements the same interface — fetchLeagues(), fetchMatchups(), fetchRoster(), etc. — so the rest of your app doesn't care which provider the data came from. BullMQ (which we already have from our backend choice) schedules and runs sync jobs: full historical imports when a league is first connected, then incremental updates on a schedule. Each job is retryable, has error handling, and reports progress. I recommend this because it's the most straightforward architecture that cleanly separates "how to talk to Yahoo" from "how to store a matchup," and BullMQ gives you reliable job processing with retry logic built in.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Clean separation — adding a new provider means writing one adapter</li>
+            <li>BullMQ handles retries, rate limiting, and progress tracking</li>
+            <li>Easy to test — mock the adapter, test the sync logic</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Full historical import can be slow (many API calls per season)</li>
+            <li>Each adapter needs ongoing maintenance as provider APIs change</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Adapter + Webhook/Polling Hybrid -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Adapters + Live Polling</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box provider">Yahoo</div>
+            <div class="arch-box provider">ESPN</div>
+            <div class="arch-box provider">Sleeper</div>
+          </div>
+          <div class="arch-arrow">↕ adapters + polling</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Adapters</div>
+            <div class="arch-box service">Polling Service</div>
+          </div>
+          <div class="arch-arrow">↓ events</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Event Bus</div>
+          </div>
+          <div class="arch-arrow">↓ triggers</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Sync Workers</div>
+            <div class="arch-box backend">Notification Service</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer">
+            <div class="arch-box database">PostgreSQL</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Same adapter pattern as Option A, but add a live polling layer that checks providers frequently during game days (every few minutes) and less often off-season. When changes are detected — a trade happened, scores updated, waivers cleared — it emits events that trigger targeted sync jobs rather than full re-syncs. This enables near-real-time features: push notifications when a trade goes through, live score updates during games, waiver results as they process. More complex to build but unlocks the "live" features that make fantasy apps sticky.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Near-real-time updates — scores, trades, waivers as they happen</li>
+            <li>Event-driven sync is more efficient than full re-imports</li>
+            <li>Enables push notifications and live dashboards</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Significantly more complex — event bus, polling, change detection</li>
+            <li>Provider rate limits become a real concern with frequent polling</li>
+            <li>ESPN's unofficial API makes reliable polling fragile</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: ETL Pipeline -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">ETL Pipeline (Extract-Transform-Load)</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Extract: Pull raw JSON from providers</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Store raw data in staging tables</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">Transform: Normalize to unified model</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Validate: Check data consistency</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Load: Upsert into production tables</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">6</span>
+            <span class="flow-step-label">Compute: Refresh analytics/aggregates</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Treat provider syncing as a formal data pipeline with distinct Extract, Transform, and Load phases. First, pull raw JSON from each provider and store it as-is in staging tables (step 2 — this is your safety net if the transform logic changes). Then a transform step normalizes into your unified model (step 3), validates consistency (step 4), and loads into production tables (step 5). Finally, a compute step refreshes analytics aggregates. This is the most robust approach for data integrity — you can reprocess any step independently, and the raw data is always preserved. It's what data engineering teams use for exactly this kind of multi-source aggregation problem.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Most robust data integrity — raw data preserved, reprocessable</li>
+            <li>Transform logic can evolve without re-fetching from providers</li>
+            <li>Clear debugging — see exactly where data went wrong</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>More infrastructure — staging tables, pipeline orchestration</li>
+            <li>Higher latency — data goes through multiple stages</li>
+            <li>Over-engineered for v1 if you just need basic sync working</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Provider SDK Wrappers -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Thin Wrappers + On-Demand Fetch</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">SwiftUI App</div>
+          </div>
+          <div class="arch-arrow">↓ requests data</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Express API</div>
+          </div>
+          <div class="arch-arrow">↓ cache miss?</div>
+          <div class="arch-layer">
+            <div class="arch-box infra">Cache (Redis)</div>
+          </div>
+          <div class="arch-arrow">↓ fetch live from provider</div>
+          <div class="arch-layer">
+            <div class="arch-box provider">Yahoo</div>
+            <div class="arch-box provider">ESPN</div>
+            <div class="arch-box provider">Sleeper</div>
+          </div>
+          <div class="arch-arrow">↓ normalize + cache + return</div>
+          <div class="arch-layer">
+            <div class="arch-box database">PostgreSQL (cache long-term)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Skip the background sync entirely for v1. Instead, fetch data from providers on-demand when the user requests it, normalize it on the fly, cache it in Redis (short-term) and PostgreSQL (long-term). When someone opens their league dashboard, the API checks if we have fresh data — if not, it fetches from the provider right then. Historical data gets cached permanently after the first fetch. This is the simplest approach and gets you to a working product fastest. The downside is that first loads are slow (waiting for provider API calls) and you can't do things like push notifications since you're not actively monitoring for changes.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Simplest to build — no background jobs, no polling, no queues</li>
+            <li>Fastest path to a working MVP</li>
+            <li>No wasted API calls — only fetch what users actually look at</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Slow first loads — user waits for provider API calls</li>
+            <li>No background monitoring — can't push notifications on trades/scores</li>
+            <li>Provider rate limits can cause request failures during peak times</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Adapter + Job Queue</th>
+            <th class="col-b">B: Adapters + Live Polling</th>
+            <th class="col-c">C: ETL Pipeline</th>
+            <th class="col-d">D: On-Demand Fetch</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Build Complexity</td>
+            <td class="col-recommended">Medium — adapters + BullMQ jobs</td>
+            <td>High — polling, events, change detection</td>
+            <td>High — staging tables, pipeline stages</td>
+            <td>Low — just fetch and cache</td>
+          </tr>
+          <tr>
+            <td>Data Freshness</td>
+            <td class="col-recommended">Good — scheduled syncs (hourly/daily)</td>
+            <td>Best — near-real-time during game days</td>
+            <td>Good — scheduled pipeline runs</td>
+            <td>Stale until user requests — then fresh</td>
+          </tr>
+          <tr>
+            <td>Adding New Provider</td>
+            <td class="col-recommended">Write one adapter implementing the interface</td>
+            <td>Write adapter + polling config + event mappings</td>
+            <td>Write extractor + transformer</td>
+            <td>Write one thin wrapper</td>
+          </tr>
+          <tr>
+            <td>Data Integrity</td>
+            <td class="col-recommended">Good — retries, error handling per job</td>
+            <td>Good — but more failure modes to handle</td>
+            <td>Best — raw data preserved, full reprocessing</td>
+            <td>Weakest — errors surface to users directly</td>
+          </tr>
+          <tr>
+            <td>Push Notification Support</td>
+            <td class="col-recommended">Possible — detect changes between syncs</td>
+            <td>Best — event-driven, real-time change detection</td>
+            <td>Possible — diff between pipeline runs</td>
+            <td>Not possible — no background monitoring</td>
+          </tr>
+          <tr>
+            <td>First Load Experience</td>
+            <td class="col-recommended">Good — import runs in background, show progress</td>
+            <td>Good — same as A, plus live updates once imported</td>
+            <td>Good — pipeline runs, user sees progress</td>
+            <td>Slow — user waits for API calls on first visit</td>
+          </tr>
+          <tr>
+            <td>Provider Rate Limit Risk</td>
+            <td class="col-recommended">Low — controlled, scheduled calls</td>
+            <td>Medium — frequent polling can hit limits</td>
+            <td>Low — controlled batch extraction</td>
+            <td>Medium — user-triggered bursts possible</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

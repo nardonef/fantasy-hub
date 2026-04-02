@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 7: Visual Direction — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.visual { background: #fce7f3; color: #be185d; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 260px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; max-width: 1200px; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 7 of 12</span>
+    <h1>Visual Direction</h1>
+    <span class="category-badge visual">Visual</span>
+    <p class="decision-description">
+      How should Fantasy League Hub look and feel? This is an iOS-native app built with SwiftUI, so we're working within Apple's design language — but there's still a lot of room for personality. Fantasy football apps range from ESPN's dense sports-news aesthetic to Sleeper's modern dark-mode vibe. Since our app is data-heavy (charts, tables, stats) but also has a social/fun side (rivalries, trash talk, AI chat), the visual direction needs to make dense data feel approachable without dumbing it down.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Clean Analytics -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Broadcast Dark + Trophy Gold</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div style="width:100%;max-width:320px">
+          <div style="background:#1a1a1a;border-radius:20px;padding:20px;font-family:-apple-system,system-ui,sans-serif;color:#e8e2d6">
+            <!-- Scoreboard-style header with week ticker -->
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+              <div style="font-size:20px;font-weight:700;color:#e8e2d6;letter-spacing:-0.03em">Power Rankings</div>
+              <div style="font-size:10px;color:#c9a96e;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;border:1px solid #c9a96e33;padding:2px 8px;border-radius:4px">WK 14</div>
+            </div>
+            <div style="height:1px;background:linear-gradient(90deg,#c9a96e44,transparent);margin-bottom:14px"></div>
+            <!-- Rank 1 — scoreboard row with left accent -->
+            <div style="display:flex;align-items:center;gap:10px;background:#222;border-radius:8px;padding:10px 12px;margin-bottom:6px;border-left:3px solid #c9a96e">
+              <div style="font-size:20px;font-weight:800;color:#c9a96e;width:24px;text-align:center;font-variant-numeric:tabular-nums">1</div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:#e8e2d6">Frank's Team</div>
+                <div style="font-size:10px;color:#777;font-variant-numeric:tabular-nums">10–3 &nbsp;·&nbsp; 1,847.2 PF</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:6px solid #4ade80"></div>
+                <div style="font-size:11px;color:#4ade80;font-weight:700;font-variant-numeric:tabular-nums">2</div>
+              </div>
+            </div>
+            <!-- Rank 2 -->
+            <div style="display:flex;align-items:center;gap:10px;background:#222;border-radius:8px;padding:10px 12px;margin-bottom:6px;border-left:3px solid #444">
+              <div style="font-size:20px;font-weight:800;color:#666;width:24px;text-align:center;font-variant-numeric:tabular-nums">2</div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:#e8e2d6">The Destroyers</div>
+                <div style="font-size:10px;color:#777;font-variant-numeric:tabular-nums">9–4 &nbsp;·&nbsp; 1,792.8 PF</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid #f87171"></div>
+                <div style="font-size:11px;color:#f87171;font-weight:700;font-variant-numeric:tabular-nums">1</div>
+              </div>
+            </div>
+            <!-- Stat row — scoreboard ticker style -->
+            <div style="display:flex;gap:1px;margin-top:12px;background:#333;border-radius:8px;overflow:hidden">
+              <div style="flex:1;background:#1a1a1a;padding:10px 8px;text-align:center">
+                <div style="font-size:19px;font-weight:700;color:#e8e2d6;font-variant-numeric:tabular-nums">87.3</div>
+                <div style="font-size:8px;color:#666;margin-top:3px;letter-spacing:0.08em;text-transform:uppercase">Luck Idx</div>
+              </div>
+              <div style="flex:1;background:#1a1a1a;padding:10px 8px;text-align:center">
+                <div style="font-size:19px;font-weight:700;color:#4ade80;font-variant-numeric:tabular-nums">A+</div>
+                <div style="font-size:8px;color:#666;margin-top:3px;letter-spacing:0.08em;text-transform:uppercase">Draft</div>
+              </div>
+              <div style="flex:1;background:#1a1a1a;padding:10px 8px;text-align:center">
+                <div style="font-size:19px;font-weight:700;color:#c9a96e;font-variant-numeric:tabular-nums">6</div>
+                <div style="font-size:8px;color:#666;margin-top:3px;letter-spacing:0.08em;text-transform:uppercase">Streak</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Dark mode rooted in real sports design language — not SaaS dashboards. The palette is charcoal (#1a1a1a) and warm cream (#e8e2d6) with a single metallic accent: old gold (#c9a96e), the color of championship trophies and hall-of-fame plaques. No purple gradients, no indigo, no "AI startup" vibes. Layout references real scoreboards: tabular numbers, thin divider lines instead of heavy card borders, a ticker-style stat row at the bottom. The gold accent is used sparingly — only for #1 rankings, key highlights, and the week indicator. Everything else is restrained grays and warm whites. This is my recommendation because it has genuine character that's rooted in football culture (broadcast graphics, trophy gold, scoreboard typography) rather than generic dashboard aesthetics.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Distinctive identity — doesn't look like every other dark-mode app</li>
+            <li>Gold accent is rooted in sports culture (trophies, championships)</li>
+            <li>Scoreboard-inspired layouts feel native to fantasy football</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Restrained palette means fewer colors for chart differentiation</li>
+            <li>Still need a solid light mode for accessibility</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Clean Light -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Clean Light Dashboard</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div style="width:100%;max-width:320px">
+          <div style="background:white;border-radius:20px;padding:20px;font-family:-apple-system,system-ui,sans-serif;color:#0f172a;border:1px solid #e2e8f0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+              <div style="font-size:11px;color:#64748b;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Power Rankings</div>
+              <div style="font-size:10px;color:#3b82f6;font-weight:600;background:#eff6ff;padding:3px 8px;border-radius:6px">Week 14</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid #f1f5f9">
+              <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white">1</div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600">Frank's Team</div>
+                <div style="font-size:10px;color:#64748b">10-3 · 1,847.2 PF</div>
+              </div>
+              <div style="font-size:11px;color:#16a34a;font-weight:700">+2</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;background:#f8fafc;border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid #f1f5f9">
+              <div style="width:32px;height:32px;border-radius:10px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#475569">2</div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600">The Destroyers</div>
+                <div style="font-size:10px;color:#64748b">9-4 · 1,792.8 PF</div>
+              </div>
+              <div style="font-size:11px;color:#dc2626;font-weight:700">-1</div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:14px">
+              <div style="flex:1;background:#f0f9ff;border-radius:10px;padding:10px;text-align:center;border:1px solid #e0f2fe">
+                <div style="font-size:18px;font-weight:800;color:#0369a1">87.3</div>
+                <div style="font-size:9px;color:#64748b;margin-top:2px">Luck Index</div>
+              </div>
+              <div style="flex:1;background:#f0fdf4;border-radius:10px;padding:10px;text-align:center;border:1px solid #dcfce7">
+                <div style="font-size:18px;font-weight:800;color:#16a34a">A+</div>
+                <div style="font-size:9px;color:#64748b;margin-top:2px">Draft Grade</div>
+              </div>
+              <div style="flex:1;background:#fffbeb;border-radius:10px;padding:10px;text-align:center;border:1px solid #fef3c7">
+                <div style="font-size:18px;font-weight:800;color:#d97706">6</div>
+                <div style="font-size:9px;color:#64748b;margin-top:2px">Win Streak</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Bright, clean, and airy — a light-first design inspired by Apple Health, Notion, and modern fintech dashboards. White and light gray surfaces with generous spacing, soft shadows, and colorful stat cards that use tinted backgrounds (light blue for one metric, light green for another). This approach prioritizes readability and feels more "professional analytics tool" than "sports app." Data tables and charts are extremely readable in light mode. It feels mature and trustworthy — like the kind of tool a commissioner would take seriously.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Best readability for dense data tables and small text</li>
+            <li>Feels professional and trustworthy</li>
+            <li>Easiest to implement — aligns with SwiftUI defaults</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Can feel bland compared to dark-mode sports apps</li>
+            <li>Less "exciting" — may not hook the casual fantasy player</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Bold Sports Energy -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Bold Sports Energy</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div style="width:100%;max-width:320px">
+          <div style="background:#111827;border-radius:20px;padding:20px;font-family:-apple-system,system-ui,sans-serif;color:white">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+              <div style="font-size:13px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;background:linear-gradient(135deg,#ef4444,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Power Rankings</div>
+              <div style="font-size:10px;color:#ef4444;font-weight:800;text-transform:uppercase">Week 14</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#1f2937,#111827);border-radius:12px;padding:12px;margin-bottom:8px;border-left:4px solid #ef4444">
+              <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#ef4444,#f59e0b);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900">1</div>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:0.02em">Frank's Team</div>
+                <div style="font-size:10px;color:#9ca3af;font-weight:600">10-3 · 1,847.2 PF</div>
+              </div>
+              <div style="font-size:12px;color:#22c55e;font-weight:900">+2</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;background:#1f2937;border-radius:12px;padding:12px;margin-bottom:8px;border-left:4px solid #6b7280">
+              <div style="width:36px;height:36px;border-radius:8px;background:#374151;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#9ca3af">2</div>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:0.02em">The Destroyers</div>
+                <div style="font-size:10px;color:#9ca3af;font-weight:600">9-4 · 1,792.8 PF</div>
+              </div>
+              <div style="font-size:12px;color:#ef4444;font-weight:900">-1</div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:14px">
+              <div style="flex:1;background:#1f2937;border-radius:10px;padding:10px;text-align:center;border-top:3px solid #ef4444">
+                <div style="font-size:20px;font-weight:900;color:white">87.3</div>
+                <div style="font-size:8px;color:#6b7280;margin-top:2px;text-transform:uppercase;font-weight:700;letter-spacing:0.05em">Luck Index</div>
+              </div>
+              <div style="flex:1;background:#1f2937;border-radius:10px;padding:10px;text-align:center;border-top:3px solid #22c55e">
+                <div style="font-size:20px;font-weight:900;color:white">A+</div>
+                <div style="font-size:8px;color:#6b7280;margin-top:2px;text-transform:uppercase;font-weight:700;letter-spacing:0.05em">Draft Grade</div>
+              </div>
+              <div style="flex:1;background:#1f2937;border-radius:10px;padding:10px;text-align:center;border-top:3px solid #f59e0b">
+                <div style="font-size:20px;font-weight:900;color:white">6</div>
+                <div style="font-size:8px;color:#6b7280;margin-top:2px;text-transform:uppercase;font-weight:700;letter-spacing:0.05em">Win Streak</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        High-energy, bold, and unapologetically sporty. Think ESPN meets a modern gaming UI — heavy fonts, gradient accents, colored borders, uppercase text, and strong visual hierarchy. This is the most "fantasy football" feeling option. Red-orange-gold gradients for top rankings, bold uppercase team names, thick colored borders on stat cards. It's exciting and competitive — it makes checking your power ranking feel like game day. The risk is it can feel overwhelming with dense analytics data, and it won't age as gracefully as the cleaner options.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Most exciting — makes fantasy feel like a real sport</li>
+            <li>Strong emotional response — competitive, energizing</li>
+            <li>Great for engagement and social sharing (screenshots look bold)</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Can feel overwhelming with lots of data on screen</li>
+            <li>Bold typography eats space — less room for dense tables</li>
+            <li>May feel dated faster than cleaner designs</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Apple Native Minimal -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Apple Native Minimal</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div style="width:100%;max-width:320px">
+          <div style="background:#f2f2f7;border-radius:20px;padding:20px;font-family:-apple-system,system-ui,sans-serif;color:#1c1c1e">
+            <div style="font-size:28px;font-weight:700;letter-spacing:-0.02em;margin-bottom:4px">Power Rankings</div>
+            <div style="font-size:13px;color:#8e8e93;margin-bottom:16px">Week 14 · Updated 2h ago</div>
+            <div style="background:white;border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:0.5px solid #e5e5ea">
+                <div style="width:28px;height:28px;border-radius:14px;background:#007aff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white">1</div>
+                <div style="flex:1">
+                  <div style="font-size:15px;font-weight:600">Frank's Team</div>
+                  <div style="font-size:12px;color:#8e8e93">10-3 · 1,847.2 PF</div>
+                </div>
+                <div style="font-size:13px;color:#34c759;font-weight:600">+2</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+                <div style="width:28px;height:28px;border-radius:14px;background:#e5e5ea;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#8e8e93">2</div>
+                <div style="flex:1">
+                  <div style="font-size:15px;font-weight:600">The Destroyers</div>
+                  <div style="font-size:12px;color:#8e8e93">9-4 · 1,792.8 PF</div>
+                </div>
+                <div style="font-size:13px;color:#ff3b30;font-weight:600">-1</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <div style="flex:1;background:white;border-radius:12px;padding:12px;text-align:center">
+                <div style="font-size:22px;font-weight:700;color:#007aff">87.3</div>
+                <div style="font-size:10px;color:#8e8e93;margin-top:2px">Luck Index</div>
+              </div>
+              <div style="flex:1;background:white;border-radius:12px;padding:12px;text-align:center">
+                <div style="font-size:22px;font-weight:700;color:#34c759">A+</div>
+                <div style="font-size:10px;color:#8e8e93;margin-top:2px">Draft Grade</div>
+              </div>
+              <div style="flex:1;background:white;border-radius:12px;padding:12px;text-align:center">
+                <div style="font-size:22px;font-weight:700;color:#ff9500">6</div>
+                <div style="font-size:10px;color:#8e8e93;margin-top:2px">Win Streak</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Look and feel exactly like an Apple first-party app — Settings, Health, Fitness. Use Apple's standard grouped list style, SF Symbols for icons, system colors (#007AFF blue, #34C759 green, #FF3B30 red), system gray backgrounds (#F2F2F7), and large bold titles. Zero custom branding — the app looks like it came installed on your iPhone. This is the fastest to build because you're using all of SwiftUI's default components with no customization. It also automatically looks great in both light and dark mode. The downside is zero personality — it doesn't feel like "Fantasy League Hub," it feels like "Apple Fantasy."
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Fastest to build — SwiftUI defaults do all the work</li>
+            <li>Perfect light/dark mode for free with system colors</li>
+            <li>Users already know how to navigate it — familiar patterns</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>No brand identity — looks like every other iOS utility app</li>
+            <li>Hard to stand out in the App Store</li>
+            <li>Can feel boring for a "fun" category like fantasy sports</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Broadcast Dark + Gold</th>
+            <th class="col-b">B: Clean Light Dashboard</th>
+            <th class="col-c">C: Bold Sports Energy</th>
+            <th class="col-d">D: Apple Native Minimal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Personality</td>
+            <td class="col-recommended">Sports broadcast, championship, distinctive</td>
+            <td>Professional, trustworthy, calm</td>
+            <td>Exciting, competitive, bold</td>
+            <td>Minimal — no distinct personality</td>
+          </tr>
+          <tr>
+            <td>Data Readability</td>
+            <td class="col-recommended">Great — warm cream on charcoal, easy on eyes</td>
+            <td>Best — light bg is easiest on eyes</td>
+            <td>Medium — bold styling competes with data</td>
+            <td>Good — Apple's defaults are well-tested</td>
+          </tr>
+          <tr>
+            <td>Chart / Data Viz Feel</td>
+            <td class="col-recommended">Scoreboard-inspired, gold accents for key stats</td>
+            <td>Clean and precise</td>
+            <td>Bold gradients, high impact</td>
+            <td>System colors, functional</td>
+          </tr>
+          <tr>
+            <td>Build Speed</td>
+            <td class="col-recommended">Medium — custom palette + scoreboard layouts</td>
+            <td>Fast — close to SwiftUI defaults</td>
+            <td>Slower — lots of custom styling</td>
+            <td>Fastest — pure SwiftUI defaults</td>
+          </tr>
+          <tr>
+            <td>Dark/Light Mode</td>
+            <td class="col-recommended">Dark primary, warm light secondary</td>
+            <td>Light primary, dark secondary</td>
+            <td>Dark only (would look odd light)</td>
+            <td>Both — system-adaptive for free</td>
+          </tr>
+          <tr>
+            <td>App Store Differentiation</td>
+            <td class="col-recommended">Highest — unique identity, unmistakable</td>
+            <td>Medium — clean but common</td>
+            <td>High — bold and attention-grabbing</td>
+            <td>Low — blends in with utility apps</td>
+          </tr>
+          <tr>
+            <td>Target Audience Fit</td>
+            <td class="col-recommended">Everyone — sports-rooted but sophisticated</td>
+            <td>Commissioners + serious analysts</td>
+            <td>Casual players + trash talkers</td>
+            <td>Utility-focused users</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

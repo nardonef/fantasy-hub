@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 12: Phased Delivery Strategy — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.interaction { background: #e0f2fe; color: #0369a1; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; max-width: 1200px; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    /* Phase timeline styles */
+    .phase-timeline { width: 100%; max-width: 280px; display: flex; flex-direction: column; gap: 0; }
+    .phase-block { border-radius: 10px; padding: 10px 12px; font-size: 0.65rem; line-height: 1.5; }
+    .phase-block h4 { font-size: 0.7rem; font-weight: 700; margin-bottom: 4px; }
+    .phase-block ul { list-style: none; padding: 0; }
+    .phase-block li { padding: 1px 0; }
+    .phase-block li::before { content: "• "; font-weight: 700; }
+    .phase-divider { text-align: center; font-size: 0.9rem; color: #94a3b8; padding: 2px 0; }
+
+    .phase-v1 { background: #1a1a1a; color: #e8e2d6; border: 2px solid #c9a96e; }
+    .phase-v1 h4 { color: #c9a96e; }
+    .phase-v1 li::before { color: #c9a96e; }
+
+    .phase-v2 { background: #f8fafc; color: #334155; border: 2px solid #6366f1; }
+    .phase-v2 h4 { color: #6366f1; }
+    .phase-v2 li::before { color: #6366f1; }
+
+    .phase-v3 { background: #f8fafc; color: #64748b; border: 2px dashed #cbd5e1; }
+    .phase-v3 h4 { color: #94a3b8; }
+    .phase-v3 li::before { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 12 of 12</span>
+    <h1>Phased Delivery Strategy</h1>
+    <span class="category-badge interaction">Interaction</span>
+    <p class="decision-description">
+      You've made 11 decisions that define a very ambitious app. Now the question is: what ships first? The tension is between getting something into people's hands quickly (so you can validate the concept and get feedback) versus building enough that the app is genuinely impressive on first impression. Fantasy football is seasonal — if you ship mid-season, people might not bother until next year. If you wait for everything, you might never ship. This decision shapes the v1 feature set, what gets deferred to v2 and v3, and the overall timeline strategy.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Analytics First -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Analytics-First Launch</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="phase-timeline">
+          <div class="phase-block phase-v1">
+            <h4>V1 — CORE ANALYTICS</h4>
+            <ul>
+              <li>Yahoo + Sleeper provider sync</li>
+              <li>Progressive onboarding flow</li>
+              <li>Dashboard with league overview</li>
+              <li>All analytics categories (scrollable sections)</li>
+              <li>Head-to-head, standings, scoring trends</li>
+              <li>Draft grades, power rankings, records</li>
+              <li>Season filter (current / all-time)</li>
+              <li>League invite links</li>
+            </ul>
+          </div>
+          <div class="phase-divider">↓</div>
+          <div class="phase-block phase-v2">
+            <h4>V2 — AI + SOCIAL</h4>
+            <ul>
+              <li>AI chat with contextual triggers</li>
+              <li>ESPN provider adapter</li>
+              <li>Weekly recap narratives</li>
+              <li>Push notifications</li>
+              <li>Manager profile sharing</li>
+            </ul>
+          </div>
+          <div class="phase-divider">↓</div>
+          <div class="phase-block phase-v3">
+            <h4>V3 — ENGAGEMENT</h4>
+            <ul>
+              <li>Trade analyzer</li>
+              <li>Waiver recommendations</li>
+              <li>Playoff probability models</li>
+              <li>League awards ceremony</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Ship the analytics engine first — that's the core value prop. V1 connects Yahoo and Sleeper (the two with the best APIs), imports all historical data, and gives users the full analytics dashboard: standings, head-to-head, scoring trends, draft grades, power rankings, and records. No AI chat yet — that's v2. The reasoning: analytics alone is a compelling product. Nobody else does multi-provider historical analytics well. The AI is exciting but it's also the riskiest, most expensive feature to get right. I recommend this because it lets you validate the core idea (do people actually want cross-platform analytics?) before investing heavily in AI. ESPN is deferred to v2 because their API is the most painful to integrate.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Core value prop ships first — analytics is the hook</li>
+            <li>Validates demand before investing in AI</li>
+            <li>2 providers is enough to prove cross-platform works</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>No AI in v1 — loses the "wow factor" differentiator</li>
+            <li>ESPN users are left out until v2</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: AI-First Slice -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">AI-First Vertical Slice</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="phase-timeline">
+          <div class="phase-block phase-v1">
+            <h4>V1 — CHAT + BASIC STATS</h4>
+            <ul>
+              <li>Sleeper provider only (easiest API)</li>
+              <li>Minimal onboarding</li>
+              <li>Basic dashboard (standings, record)</li>
+              <li>AI chat — full conversational experience</li>
+              <li>Natural language stat lookups</li>
+              <li>Contextual triggers on basic views</li>
+            </ul>
+          </div>
+          <div class="phase-divider">↓</div>
+          <div class="phase-block phase-v2">
+            <h4>V2 — FULL ANALYTICS</h4>
+            <ul>
+              <li>Yahoo + ESPN providers</li>
+              <li>Complete analytics dashboard</li>
+              <li>Draft grades, trends, luck index</li>
+              <li>League invites + sharing</li>
+            </ul>
+          </div>
+          <div class="phase-divider">↓</div>
+          <div class="phase-block phase-v3">
+            <h4>V3 — ENGAGEMENT</h4>
+            <ul>
+              <li>Weekly AI narratives</li>
+              <li>Trade analyzer</li>
+              <li>Waiver recommendations</li>
+              <li>Awards + milestones</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Lead with the AI — it's the most differentiated feature. V1 connects Sleeper only (public API, no OAuth headaches), imports league data, and ships the full AI chat experience with a basic stats dashboard. The bet: people will share the AI conversations ("look what this app knows about our league") and that drives organic growth. The analytics dashboard is intentionally minimal in v1 — just enough data views for the AI to reference. This is riskier because the AI needs to be genuinely good on day one, and you're limiting your addressable market to Sleeper users initially.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Most shareable — AI conversations drive word-of-mouth</li>
+            <li>Sleeper-only makes v1 integration simple</li>
+            <li>Differentiator ships day one</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>AI must be great on day one — no room for mediocre</li>
+            <li>Sleeper-only limits initial addressable market</li>
+            <li>LLM costs from day one with no proven revenue</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Full Stack MVP -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Everything-Lite MVP</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="phase-timeline">
+          <div class="phase-block phase-v1">
+            <h4>V1 — EVERYTHING (LITE)</h4>
+            <ul>
+              <li>All 3 providers (Yahoo, ESPN, Sleeper)</li>
+              <li>Full onboarding flow</li>
+              <li>Dashboard + basic analytics (3 sections)</li>
+              <li>AI chat (text-only, no rich cards)</li>
+              <li>League invites</li>
+              <li>Basic head-to-head + standings</li>
+            </ul>
+          </div>
+          <div class="phase-divider">↓</div>
+          <div class="phase-block phase-v2">
+            <h4>V2 — DEPTH</h4>
+            <ul>
+              <li>Rich AI responses (charts, tables)</li>
+              <li>Full analytics (all categories)</li>
+              <li>Draft grades, luck index, trends</li>
+              <li>Contextual AI triggers</li>
+            </ul>
+          </div>
+          <div class="phase-divider">↓</div>
+          <div class="phase-block phase-v3">
+            <h4>V3 — POLISH</h4>
+            <ul>
+              <li>AI narratives + weekly recaps</li>
+              <li>Trade analyzer</li>
+              <li>Playoff models</li>
+              <li>Awards ceremony</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Ship a little bit of everything. V1 includes all three providers, a basic analytics dashboard (standings, H2H, scoring trends — but not the full category scroll), text-only AI chat, and league invites. Nothing is deep, but nothing is missing either. The idea: users from any platform can join, they get a taste of analytics and AI, and you learn what they engage with most to decide where to go deeper in v2. The risk is that nothing is deep enough to be impressive — "jack of all trades, master of none" — and first impressions matter for retention.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>All platforms supported from day one — biggest addressable market</li>
+            <li>Users get a taste of every feature</li>
+            <li>Learn what users care about before going deep</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Nothing is impressive enough to retain users</li>
+            <li>ESPN integration is painful and may delay launch</li>
+            <li>Text-only AI feels underwhelming after the marketing pitch</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Offseason Launch -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Big Bang Offseason Launch</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="phase-timeline">
+          <div class="phase-block phase-v1">
+            <h4>V1 — FULL PRODUCT (OFFSEASON)</h4>
+            <ul>
+              <li>All 3 providers</li>
+              <li>Complete progressive onboarding</li>
+              <li>Full analytics dashboard (all sections)</li>
+              <li>AI chat with rich responses + triggers</li>
+              <li>League invites + sharing</li>
+              <li>Draft grades, records, power rankings</li>
+              <li>Manager profiles</li>
+            </ul>
+          </div>
+          <div class="phase-divider">↓</div>
+          <div class="phase-block phase-v2">
+            <h4>V2 — IN-SEASON FEATURES</h4>
+            <ul>
+              <li>Weekly AI recaps + storylines</li>
+              <li>Live scoring integration</li>
+              <li>Trade analyzer</li>
+              <li>Waiver recommendations</li>
+            </ul>
+          </div>
+          <div class="phase-divider">↓</div>
+          <div class="phase-block phase-v3">
+            <h4>V3 — GROWTH</h4>
+            <ul>
+              <li>Playoff probability models</li>
+              <li>League awards ceremony</li>
+              <li>Additional sports (basketball, baseball)</li>
+              <li>Premium tier</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Don't rush a half-baked product. Build the full vision — all providers, complete analytics, rich AI chat — and launch during the NFL offseason (June-July) when fantasy managers are bored, nostalgic about last season, and starting to think about the upcoming draft. The offseason is when people actually have time to explore historical data and reminisce. A full-featured launch makes a bigger splash, gets better App Store reviews, and takes advantage of the natural fantasy football calendar. V2 adds in-season features (weekly recaps, trade analysis) in time for the NFL season. The risk: this is the longest development timeline, and you're betting you can build everything before the window opens.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>First impression is the complete vision — no compromises</li>
+            <li>Offseason timing aligns perfectly with historical data exploration</li>
+            <li>Better App Store reviews from a polished, feature-complete launch</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Longest time to market — months of building before any user feedback</li>
+            <li>Risk of over-building features nobody uses</li>
+            <li>If you miss the offseason window, you wait a full year</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Analytics First</th>
+            <th class="col-b">B: AI-First Slice</th>
+            <th class="col-c">C: Everything Lite</th>
+            <th class="col-d">D: Big Bang</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Time to V1 Ship</td>
+            <td class="col-recommended">~8-10 weeks</td>
+            <td>~6-8 weeks</td>
+            <td>~12-14 weeks</td>
+            <td>~16-20 weeks</td>
+          </tr>
+          <tr>
+            <td>Providers in V1</td>
+            <td class="col-recommended">Yahoo + Sleeper</td>
+            <td>Sleeper only</td>
+            <td>All 3</td>
+            <td>All 3</td>
+          </tr>
+          <tr>
+            <td>AI in V1</td>
+            <td class="col-recommended">No</td>
+            <td>Full chat experience</td>
+            <td>Text-only basic</td>
+            <td>Full with rich responses</td>
+          </tr>
+          <tr>
+            <td>Analytics Depth in V1</td>
+            <td class="col-recommended">Full (all categories)</td>
+            <td>Basic (standings + record)</td>
+            <td>Partial (3 sections)</td>
+            <td>Full (all categories)</td>
+          </tr>
+          <tr>
+            <td>First Impression Quality</td>
+            <td class="col-recommended">Strong — deep analytics</td>
+            <td>Impressive if AI is good</td>
+            <td>Mediocre — nothing deep</td>
+            <td>Best — complete product</td>
+          </tr>
+          <tr>
+            <td>Risk Level</td>
+            <td class="col-recommended">Low — proven concept</td>
+            <td>High — AI must be great</td>
+            <td>Medium — spread thin</td>
+            <td>High — long timeline, no feedback</td>
+          </tr>
+          <tr>
+            <td>LLM Costs at Launch</td>
+            <td class="col-recommended">None</td>
+            <td>Immediate</td>
+            <td>Low (text-only)</td>
+            <td>Full</td>
+          </tr>
+          <tr>
+            <td>User Feedback Speed</td>
+            <td class="col-recommended">Fast — ship and learn</td>
+            <td>Fastest — small scope</td>
+            <td>Medium</td>
+            <td>Slowest — build first</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

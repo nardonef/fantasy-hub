@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 2: Backend & API Architecture — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .decision-number {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin-top: 0.25rem;
+    }
+
+    .category-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 0.5rem;
+    }
+
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+
+    .decision-description {
+      font-size: 1rem;
+      color: #475569;
+      margin-top: 0.75rem;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+
+    .instruction {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      display: inline-block;
+      border: 1px solid #bfdbfe;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto 3rem;
+    }
+
+    .option-card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+      border: 2px solid #e2e8f0;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .option-card:hover {
+      border-color: #6366f1;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.12);
+    }
+
+    .card-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .card-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .option-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+
+    .option-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .recommended-badge {
+      background: #f59e0b;
+      color: white;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .option-card.chosen {
+      border: 3px solid #059669;
+      box-shadow: 0 4px 20px rgba(5,150,105,0.15);
+    }
+
+    .option-card.chosen:hover { border-color: #059669; }
+
+    .card-badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .chosen-badge {
+      background: #059669;
+      color: white;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      display: none;
+    }
+
+    .option-card.chosen .chosen-badge { display: inline-block; }
+
+    .option-card.not-chosen {
+      opacity: 0.55;
+      filter: grayscale(20%);
+    }
+
+    .option-card.not-chosen:hover {
+      opacity: 0.8;
+      filter: none;
+    }
+
+    .visual-preview {
+      padding: 1.5rem;
+      background: #f8fafc;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+
+    .option-summary {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      color: #334155;
+      line-height: 1.65;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .verdict {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+
+    .pros h3, .cons h3 {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+
+    .verdict ul { list-style: none; padding: 0; }
+
+    .verdict li {
+      font-size: 0.8rem;
+      color: #475569;
+      line-height: 1.5;
+      padding: 0.15rem 0;
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+
+    .card-footer {
+      padding: 0.75rem 1.25rem;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .tell-claude {
+      font-size: 0.75rem;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      display: block;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    .comparison-section {
+      max-width: 1200px;
+      margin: 0 auto 3rem;
+    }
+
+    .comparison-section h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 1rem;
+    }
+
+    .comparison-table-wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      font-size: 0.85rem;
+    }
+
+    .comparison-table th {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-bottom: 2px solid #e2e8f0;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      background: white;
+    }
+
+    .comparison-table th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #f8fafc;
+      color: #64748b;
+    }
+
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+
+    .comparison-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+
+    .comparison-table td:first-child {
+      font-weight: 600;
+      color: #475569;
+      position: sticky;
+      left: 0;
+      background: #f8fafc;
+    }
+
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+
+    .comparison-table tr:last-child td { border-bottom: none; }
+
+    .page-footer {
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .page-footer p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin: 0.3rem 0;
+    }
+
+    .page-footer strong { color: #334155; }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      color: #6366f1;
+      text-decoration: none;
+      max-width: 1200px;
+    }
+
+    .back-link:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      .options-grid { grid-template-columns: 1fr; }
+      body { padding: 1rem; }
+    }
+
+    .arch-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 0.5rem;
+      width: 100%;
+    }
+
+    .arch-layer {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .arch-box {
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #334155;
+      text-align: center;
+      min-width: 70px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .arch-box.frontend { border-color: #7c3aed; color: #7c3aed; }
+    .arch-box.backend { border-color: #0891b2; color: #0891b2; }
+    .arch-box.database { border-color: #059669; color: #059669; }
+    .arch-box.service { border-color: #dc2626; color: #dc2626; }
+    .arch-box.platform { border-color: #ea580c; color: #ea580c; }
+    .arch-box.infra { border-color: #64748b; color: #64748b; }
+
+    .arch-arrow {
+      font-size: 1rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    .arch-note {
+      font-size: 0.6rem;
+      color: #94a3b8;
+      text-align: center;
+      font-style: italic;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 2 of 12</span>
+    <h1>Backend & API Architecture</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      Fantasy League Hub's backend has to do a lot of heavy lifting: sync data from three different fantasy providers (Yahoo, ESPN, Sleeper), compute analytics across years of league history, serve an AI chat that understands your league context, and handle multi-user access with real-time updates. Since we chose SwiftUI Native for the frontend, the backend language doesn't need to match — we're free to pick whatever is best for the job. The key question is how much infrastructure you want to manage yourself versus how much you want a platform to handle.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Node.js + Express -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Node.js Express API</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">SwiftUI App</div>
+          </div>
+          <div class="arch-arrow">↕ REST API</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Express (TypeScript)</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box service">BullMQ Workers</div>
+            <div class="arch-box service">Provider Sync</div>
+            <div class="arch-box service">AI Service</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box database">PostgreSQL</div>
+            <div class="arch-box infra">Redis</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer">
+            <div class="arch-box platform">Railway / Fly.io</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        A Node.js server with Express, written in TypeScript. This is the most battle-tested approach for building REST APIs. You get a massive ecosystem of libraries — BullMQ for background job queues (provider syncing), Passport for auth, and great LLM SDK support (Anthropic, OpenAI). Background workers handle the heavy provider sync jobs separately from API requests. Deploy to Railway or Fly.io with minimal DevOps. I recommend this because it's the most straightforward path to a production backend with all the pieces Fantasy League Hub needs — and the ecosystem for API integrations, job queues, and AI SDKs is unmatched.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Largest ecosystem for API integrations and LLM SDKs</li>
+            <li>BullMQ gives you robust background jobs for provider syncing</li>
+            <li>Easy to hire for and find help online</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Single-threaded — CPU-heavy analytics need careful handling</li>
+            <li>TypeScript types are optional, not enforced at runtime</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Python FastAPI -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Python FastAPI</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">SwiftUI App</div>
+          </div>
+          <div class="arch-arrow">↕ REST API (auto-docs)</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">FastAPI (Python)</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Celery Workers</div>
+            <div class="arch-box service">Provider Sync</div>
+            <div class="arch-box service">AI / Pandas</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box database">PostgreSQL</div>
+            <div class="arch-box infra">Redis</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer">
+            <div class="arch-box platform">Railway / Fly.io</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Python with FastAPI — a modern, async-first Python framework that auto-generates API documentation from your type hints. Python is the natural home for data-heavy work: Pandas for analytics computation, NumPy for statistical calculations (luck index, consistency ratings), and first-class LLM library support. Celery handles background jobs for provider syncing. The auto-generated Swagger docs are a nice bonus for debugging your Swift networking layer. The trade-off is that Python is slower than Node for raw API throughput, though for this app the bottleneck will be database queries, not the server.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Best ecosystem for data analytics (Pandas, NumPy, SciPy)</li>
+            <li>First-class LLM/AI library support</li>
+            <li>Auto-generated API docs from type hints</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Slower raw throughput than Node or Go</li>
+            <li>Celery is powerful but complex to configure</li>
+            <li>Async Python has more gotchas than Node's event loop</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Supabase + Edge Functions -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Supabase Platform</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">SwiftUI App</div>
+          </div>
+          <div class="arch-arrow">↕ Supabase Swift SDK</div>
+          <div class="arch-layer">
+            <div class="arch-box platform">Supabase</div>
+          </div>
+          <div class="arch-arrow">↕ built-in</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Edge Functions (Deno)</div>
+            <div class="arch-box service">Realtime</div>
+            <div class="arch-box service">Auth</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box database">PostgreSQL (hosted)</div>
+            <div class="arch-box database">pgvector</div>
+          </div>
+          <div class="arch-note">Auth, database, realtime, storage — all managed</div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Let Supabase handle the infrastructure. Supabase gives you a hosted PostgreSQL database, built-in auth, realtime subscriptions, file storage, and Edge Functions (serverless Deno/TypeScript) — all out of the box. There's an official Swift SDK, so your SwiftUI app talks directly to Supabase. Complex analytics can run as database functions (PL/pgSQL) or Edge Functions. This gets you to a working product fastest since auth, database, and realtime are pre-built. The downside is you're locked into Supabase's patterns, and long-running provider sync jobs don't fit cleanly into Edge Functions (they have time limits).
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Fastest path to working product — auth, DB, realtime built-in</li>
+            <li>Official Swift SDK for direct integration</li>
+            <li>Realtime subscriptions for live score updates</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Edge Functions have time limits — bad for long provider syncs</li>
+            <li>Complex analytics may outgrow database functions</li>
+            <li>Vendor lock-in — harder to migrate away later</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Swift Vapor -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Swift Vapor (Full-Stack Swift)</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">SwiftUI App</div>
+          </div>
+          <div class="arch-arrow">↕ REST API</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Vapor (Swift)</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Queues (Vapor Jobs)</div>
+            <div class="arch-box service">Provider Sync</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box database">PostgreSQL (Fluent ORM)</div>
+            <div class="arch-box infra">Redis</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer">
+            <div class="arch-box platform">Docker / Fly.io</div>
+          </div>
+          <div class="arch-note">Swift everywhere — shared models between app & API</div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Go all-Swift: use Vapor, the most mature server-side Swift framework, for the backend. Since your iOS app is already in Swift, you can share data models, validation logic, and types between the app and server using a Swift Package. Vapor has built-in support for job queues, WebSockets, and an ORM (Fluent). The appeal is one language everywhere — no context-switching between Swift and TypeScript/Python. The trade-off is a much smaller ecosystem: fewer libraries for provider API integrations, weaker LLM SDK support (you'd call Claude/OpenAI via raw HTTP), and a smaller community to get help from.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>One language (Swift) for everything — shared models and logic</li>
+            <li>Excellent performance — compiled, strongly typed</li>
+            <li>No context-switching between languages</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Much smaller ecosystem — fewer libraries for integrations</li>
+            <li>No official LLM SDKs — raw HTTP calls to Claude/OpenAI</li>
+            <li>Smaller community — harder to find answers and examples</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Node.js Express</th>
+            <th class="col-b">B: Python FastAPI</th>
+            <th class="col-c">C: Supabase</th>
+            <th class="col-d">D: Swift Vapor</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Time to First Feature</td>
+            <td class="col-recommended">Fast</td>
+            <td>Fast</td>
+            <td>Fastest — much is pre-built</td>
+            <td>Medium — smaller ecosystem means more from scratch</td>
+          </tr>
+          <tr>
+            <td>Background Job Support</td>
+            <td class="col-recommended">Excellent — BullMQ is battle-tested</td>
+            <td>Good — Celery is powerful but complex</td>
+            <td>Limited — Edge Function time limits</td>
+            <td>Good — Vapor Queues with Redis</td>
+          </tr>
+          <tr>
+            <td>Analytics Computation</td>
+            <td class="col-recommended">Good — JS is fine, can offload to DB</td>
+            <td>Best — Pandas, NumPy, SciPy</td>
+            <td>Limited — PL/pgSQL or Edge Functions</td>
+            <td>Good — compiled Swift is fast</td>
+          </tr>
+          <tr>
+            <td>LLM / AI Integration</td>
+            <td class="col-recommended">Excellent — official Anthropic & OpenAI SDKs</td>
+            <td>Excellent — first-class Python SDKs</td>
+            <td>Good — via Edge Functions</td>
+            <td>Basic — raw HTTP calls, no official SDKs</td>
+          </tr>
+          <tr>
+            <td>Code Sharing with iOS App</td>
+            <td class="col-recommended">None</td>
+            <td>None</td>
+            <td>Minimal — Swift SDK handles some</td>
+            <td>Excellent — shared Swift Packages</td>
+          </tr>
+          <tr>
+            <td>Provider API Integration</td>
+            <td class="col-recommended">Excellent — npm has everything</td>
+            <td>Great — requests, httpx, existing wrappers</td>
+            <td>Good — Deno fetch in Edge Functions</td>
+            <td>Workable — AsyncHTTPClient, fewer wrappers</td>
+          </tr>
+          <tr>
+            <td>Realtime Support</td>
+            <td class="col-recommended">Good — Socket.io or custom WebSocket</td>
+            <td>Good — FastAPI WebSocket support</td>
+            <td>Excellent — built-in Realtime engine</td>
+            <td>Good — Vapor WebSocket support</td>
+          </tr>
+          <tr>
+            <td>Ops / DevOps Complexity</td>
+            <td class="col-recommended">Low — simple Docker, easy deploy</td>
+            <td>Medium — Celery needs Redis + worker process</td>
+            <td>Lowest — fully managed</td>
+            <td>Medium — Docker, less hosting support</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

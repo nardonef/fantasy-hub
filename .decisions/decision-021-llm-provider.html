@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 21: LLM Provider & SDK — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 180px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    /* Architecture diagram */
+    .arch-diagram { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0.5rem; width: 100%; }
+    .arch-layer { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; width: 100%; }
+    .arch-box { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 7px 13px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: center; min-width: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .arch-box.frontend { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
+    .arch-box.backend { border-color: #0891b2; color: #0891b2; background: #ecfeff; }
+    .arch-box.service { border-color: #dc2626; color: #dc2626; background: #fff1f2; }
+    .arch-box.sdk { border-color: #f59e0b; color: #92400e; background: #fffbeb; }
+    .arch-box.ai { border-color: #6366f1; color: #4338ca; background: #eef2ff; }
+    .arch-arrow { font-size: 1rem; color: #94a3b8; text-align: center; }
+
+    /* Extended option colors */
+    .option-card.option-e .option-label { color: #ea580c; }
+    .option-card.option-f .option-label { color: #db2777; }
+    .comparison-table th.col-e { color: #ea580c; }
+    .comparison-table th.col-f { color: #db2777; }
+
+    /* Cost tag */
+    .cost-tag { font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+    .cost-low { background: #dcfce7; color: #166534; }
+    .cost-med { background: #fef9c3; color: #854d0e; }
+    .cost-high { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 21 of 25</span>
+    <h1>LLM Provider & SDK</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      Decision 006 locked in "RAG + Tool Use" as the AI architecture, but didn't specify which LLM to use. This choice affects everything: how tools are defined (each provider has its own format), how responses stream to the iOS client, which embedding model to use for pgvector, and your ongoing API cost per chat message. The right answer depends on context window size needed, tool calling reliability, and whether you want to stay in one provider's ecosystem.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option B but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- Option A: Claude (Anthropic) -->
+    <article class="option-card option-a not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Claude (Anthropic SDK)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">iOS Chat UI</div>
+          </div>
+          <div class="arch-arrow">↕ SSE stream</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Express API</div>
+            <div class="arch-box sdk">@anthropic-ai/sdk</div>
+          </div>
+          <div class="arch-arrow">↕ tool_use / tool_result</div>
+          <div class="arch-layer">
+            <div class="arch-box ai">Claude Sonnet 4.x</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Prisma + pgvector</div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
+            <span class="cost-tag cost-med">~$3–5/M tokens</span>
+            <span class="cost-tag cost-low">200K context</span>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use Claude Sonnet (currently claude-sonnet-4-6) via the official Anthropic TypeScript SDK. Claude has best-in-class tool use reliability — it correctly decides when to call tools and chains multi-step tool calls well. The 200K context window means you can stuff a lot of league history directly into the prompt as a fallback before reaching for pgvector. Embeddings use <code>voyage-3</code> (Anthropic's recommended partner) or OpenAI's embedding model separately.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Tool calling reliability is the top priority</li>
+            <li>200K context window reduces how much you need pgvector</li>
+            <li>You're already building with Claude Code — same ecosystem</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Embeddings need a separate model (Voyage or OpenAI)</li>
+            <li>Slightly higher cost vs. GPT-4o-mini at scale</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: OpenAI -->
+    <article class="option-card option-b chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">OpenAI (GPT-4o)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">iOS Chat UI</div>
+          </div>
+          <div class="arch-arrow">↕ SSE stream</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Express API</div>
+            <div class="arch-box sdk">openai (npm)</div>
+          </div>
+          <div class="arch-arrow">↕ function_call</div>
+          <div class="arch-layer">
+            <div class="arch-box ai">GPT-4o / 4o-mini</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Prisma + pgvector</div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
+            <span class="cost-tag cost-low">~$0.15–5/M tokens</span>
+            <span class="cost-tag cost-med">128K context</span>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use GPT-4o or GPT-4o-mini via the official OpenAI TypeScript SDK. The huge advantage: <code>text-embedding-3-small</code> gives you embeddings from the same provider at very low cost ($0.02/M tokens), which simplifies the pgvector pipeline — one API key covers both chat and embeddings. GPT-4o-mini is significantly cheaper for high-volume requests. Function calling is mature and well-documented.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>One API key for both chat and embeddings is simpler</li>
+            <li>Cost is a concern — 4o-mini is much cheaper at scale</li>
+            <li>Largest community, most examples for RAG + tool use patterns</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>128K context vs Claude's 200K — matters for large league histories</li>
+            <li>Tool calling slightly less reliable than Claude on complex multi-step tasks</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Vercel AI SDK (provider-agnostic) -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Vercel AI SDK (Provider-Agnostic)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">iOS Chat UI</div>
+          </div>
+          <div class="arch-arrow">↕ SSE stream</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Express API</div>
+            <div class="arch-box sdk">ai (Vercel SDK)</div>
+          </div>
+          <div class="arch-arrow">↕ unified interface</div>
+          <div class="arch-layer">
+            <div class="arch-box ai">Claude</div>
+            <div class="arch-box ai" style="border-color:#0891b2;color:#0891b2;background:#ecfeff;">GPT-4o</div>
+            <div class="arch-box ai" style="border-color:#059669;color:#059669;background:#ecfdf5;">Gemini</div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
+            <span class="cost-tag cost-med">varies by model</span>
+            <span class="cost-tag cost-low">swap anytime</span>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use the Vercel AI SDK — a unified TypeScript library that abstracts over Anthropic, OpenAI, Google Gemini, and others behind a single interface. You write tool definitions once and can swap the underlying model by changing one line. Streaming, tool use, and structured output work the same way regardless of provider. The tradeoff is a layer of abstraction that can lag behind provider-specific features.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want to swap providers later without rewriting tool definitions</li>
+            <li>Portability and avoiding vendor lock-in matters</li>
+            <li>Good streaming utilities built in for Node.js</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Abstraction layer can lag on new provider features</li>
+            <li>Additional dependency; less control over request shape</li>
+            <li>Overkill for a single-provider app</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Claude for chat, OpenAI for embeddings -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Claude Chat + OpenAI Embeddings</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">iOS Chat UI</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Express API</div>
+          </div>
+          <div class="arch-arrow">↕ split by task</div>
+          <div class="arch-layer">
+            <div class="arch-box ai">Claude Sonnet</div>
+            <div class="arch-box" style="border-color:#10a37f;color:#10a37f;background:#f0fdf4;font-size:0.7rem;font-weight:600;">text-embed-3-small</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Prisma + pgvector</div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
+            <span class="cost-tag cost-low">cheapest embeddings</span>
+            <span class="cost-tag cost-med">best tool calling</span>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use Claude for chat and tool calling (best reliability), but use OpenAI's <code>text-embedding-3-small</code> for generating pgvector embeddings (cheapest at scale: $0.02/M tokens). Two API keys, but each is used for what it's best at. This is the "best of both" approach — the embedding model choice doesn't affect chat quality, and OpenAI embeddings are the industry standard for RAG pipelines.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want Claude's tool calling with the cheapest embeddings</li>
+            <li>Embedding volume is high (all historical matchups, chats, etc.)</li>
+            <li>Best-of-breed over simplicity</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Two API keys and two billing accounts to manage</li>
+            <li>Slightly more complex setup than a single-provider approach</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+    <!-- Option E: LangChain -->
+    <article class="option-card option-e not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option E</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">LangChain.js (Backend Framework)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">iOS Chat UI</div>
+          </div>
+          <div class="arch-arrow">↕ SSE stream</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Express API</div>
+            <div class="arch-box sdk" style="border-color:#059669;color:#166534;background:#dcfce7;">LangChain.js</div>
+          </div>
+          <div class="arch-arrow">↕ chains / runnables</div>
+          <div class="arch-layer">
+            <div class="arch-box ai">Claude or GPT-4o</div>
+            <div class="arch-box service">pgvector retriever</div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
+            <span class="cost-tag cost-med">heavy abstraction</span>
+            <span class="cost-tag cost-low">pre-built RAG primitives</span>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        LangChain.js wraps the entire RAG pipeline — document loaders, text splitters, vector store retrievers, rerankers, and chain abstractions — so you assemble components rather than write plumbing. It supports all major LLM providers. The tradeoff: LangChain adds significant abstraction layers that obscure what's actually happening in your RAG pipeline, making debugging harder. Its value is in multi-document pipelines with complex chains — which this app doesn't need. For a focused tool-use system with known Prisma queries, direct SDK calls are more transparent.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Many document types and complex chain logic (not this app's case)</li>
+            <li>Team already knows LangChain</li>
+            <li>Pre-built retriever abstractions save time on pgvector setup</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Heavy abstraction makes debugging and observability harder</li>
+            <li>Frequent breaking changes between LangChain versions</li>
+            <li>Overkill for a focused tool-use system — adds complexity without benefit</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option E"</code>
+      </div>
+    </article>
+
+    <!-- Option F: Claude + swift-ai-sdk on iOS -->
+    <article class="option-card option-f not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option F</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Claude + swift-ai-sdk on iOS</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend" style="border-color:#ea580c;color:#ea580c;background:#fff7ed;">swift-ai-sdk</div>
+          </div>
+          <div class="arch-arrow">↕ typed streaming</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Express API</div>
+            <div class="arch-box sdk">@anthropic-ai/sdk</div>
+          </div>
+          <div class="arch-arrow">↕ tool_use</div>
+          <div class="arch-layer">
+            <div class="arch-box ai">Claude Sonnet 4.x</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Prisma + pgvector</div>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
+            <span class="cost-tag cost-med">⚠ early-stage iOS lib</span>
+            <span class="cost-tag cost-low">type-safe streaming</span>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use Claude on the backend (same as Option A), but add <code>swift-ai-sdk</code> on the iOS client to handle streaming responses with type-safe Codable structs. The Swift library is a port of Vercel AI SDK with support for all major providers. Important caveat: this is a single-developer open-source project at an early stage — the Jahnel Emerging (R4) caution applies directly. The safer iOS approach is URLSession + AsyncStream with a hand-rolled SSE parser, which is ~50 lines and has no external dependency.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want provider-agnostic streaming on iOS (swap Claude ↔ GPT)</li>
+            <li>Type-safe Codable structured outputs matter for rich response cards</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Single-developer project — risk of abandonment or breaking changes</li>
+            <li>Tool execution still goes through the Express backend — not a standalone solution</li>
+            <li>URLSession + AsyncStream handles SSE in ~50 lines without a dependency</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option F"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Claude</th>
+            <th class="col-b">B: OpenAI</th>
+            <th class="col-c">C: Vercel AI SDK</th>
+            <th class="col-d">D: Claude + OAI Embeds</th>
+            <th class="col-e">E: LangChain.js</th>
+            <th class="col-f">F: Claude + swift-ai-sdk</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Chat model</td>
+            <td class="col-recommended">Claude Sonnet 4.x</td>
+            <td>GPT-4o / 4o-mini</td>
+            <td>Configurable</td>
+            <td>Claude Sonnet 4.x</td>
+            <td>Any (Claude or GPT)</td>
+            <td>Claude Sonnet 4.x</td>
+          </tr>
+          <tr>
+            <td>Backend framework</td>
+            <td class="col-recommended">Direct SDK</td>
+            <td>Direct SDK</td>
+            <td>Vercel AI SDK</td>
+            <td>Direct SDK</td>
+            <td>LangChain.js</td>
+            <td>Direct SDK</td>
+          </tr>
+          <tr>
+            <td>iOS streaming</td>
+            <td class="col-recommended">URLSession + SSE</td>
+            <td>URLSession + SSE</td>
+            <td>URLSession + SSE</td>
+            <td>URLSession + SSE</td>
+            <td>URLSession + SSE</td>
+            <td>swift-ai-sdk</td>
+          </tr>
+          <tr>
+            <td>Embedding model</td>
+            <td class="col-recommended">Voyage-3</td>
+            <td>text-embed-3-small</td>
+            <td>Configurable</td>
+            <td>text-embed-3-small</td>
+            <td>Configurable</td>
+            <td>Voyage-3</td>
+          </tr>
+          <tr>
+            <td>Tool calling reliability</td>
+            <td class="col-recommended">Excellent</td>
+            <td>Very good</td>
+            <td>Depends on model</td>
+            <td>Excellent</td>
+            <td>Depends on model</td>
+            <td>Excellent</td>
+          </tr>
+          <tr>
+            <td>Context window</td>
+            <td class="col-recommended">200K</td>
+            <td>128K</td>
+            <td>Depends</td>
+            <td>200K</td>
+            <td>Depends</td>
+            <td>200K</td>
+          </tr>
+          <tr>
+            <td>Abstraction / debuggability</td>
+            <td class="col-recommended">Low / High</td>
+            <td>Low / High</td>
+            <td>Medium / Medium</td>
+            <td>Low / High</td>
+            <td>High / Low</td>
+            <td>Low / High</td>
+          </tr>
+          <tr>
+            <td>External dependency risk</td>
+            <td class="col-recommended">Low</td>
+            <td>Low</td>
+            <td>Low-Medium</td>
+            <td>Low</td>
+            <td>Medium (breaking changes)</td>
+            <td>High (single-dev lib)</td>
+          </tr>
+          <tr>
+            <td>Setup complexity</td>
+            <td class="col-recommended">Low</td>
+            <td>Lowest</td>
+            <td>Medium</td>
+            <td>Low-Medium</td>
+            <td>High</td>
+            <td>Medium</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option D"</strong>, or <strong>"Option E"</strong></p>
+    <p>To change a past decision: <strong>"for decision-021 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

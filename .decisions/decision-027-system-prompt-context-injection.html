@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 27: System Prompt &amp; League Context Injection — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.25rem; background: #f8fafc; display: flex; align-items: flex-start; justify-content: center; flex: 1; min-height: 200px; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .prompt-block { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.6rem; background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 8px; line-height: 1.75; width: 100%; }
+    .prompt-section { color: #c9a96e; font-weight: 700; }
+    .prompt-value { color: #86efac; }
+    .prompt-comment { color: #64748b; font-style: italic; }
+    .prompt-tool { color: #7dd3fc; }
+    .prompt-rag { color: #f9a8d4; }
+
+    .context-meter { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+    .meter-row { display: flex; align-items: center; gap: 6px; font-size: 0.62rem; }
+    .meter-label { color: #475569; width: 90px; flex-shrink: 0; }
+    .meter-bar { flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .meter-fill { height: 100%; border-radius: 4px; }
+    .meter-pct { color: #94a3b8; width: 30px; text-align: right; font-size: 0.58rem; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 27 of 28</span>
+    <h1>System Prompt &amp; League Context Injection</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      Before GPT-4o can answer "who's been my most consistent manager?", it needs to know who you are, which league you're asking about, how scoring works, and who the managers are. How that context gets into the model — and how much of it — determines answer quality, API cost, and how well the model grounds its answers in your actual league data versus hallucinating generic fantasy advice.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- OPTION A: Static system prompt + lean league header (Recommended) -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Lean Header + Tools + RAG</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%">
+          <div class="prompt-block">
+<span class="prompt-section">SYSTEM:</span>
+You are a fantasy football analyst for the
+<span class="prompt-value">BIG12 League</span> (Sleeper, PPR scoring).
+You're talking to <span class="prompt-value">Frank Nardone</span> (team: "Frank's Squad").
+Managers: <span class="prompt-value">Frank, Jake, Tyler, Sarah... (12 total)</span>
+Seasons on record: <span class="prompt-value">2019–2024</span>
+
+<span class="prompt-comment">// ~200 tokens — identity, names, nothing more</span>
+
+<span class="prompt-tool">TOOLS AVAILABLE:</span>
+- getStandings(season)
+- getMatchups(season, week?)
+- getDraftResults(season)
+- getManagerStats(managerId, season?)
+
+<span class="prompt-rag">RAG RETRIEVED (this query):</span>
+"2024 playoff results: Frank beat Jake..."
+<span class="prompt-comment">// only injected when semantically relevant</span>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        The system prompt stays lean — just enough for the model to know who's who (~200 tokens). When a question needs specific stats, the model calls tools (hitting your V1 endpoints). When a question is about narrative or history ("tell me about our rivalry"), RAG injects relevant text chunks from the embedding table. This three-layer approach keeps context costs low on simple queries and only pays for heavy context when the question actually needs it.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Balanced cost — simple questions are cheap, complex ones are thorough</li>
+            <li>Tools guarantee accuracy for stats (no hallucination)</li>
+            <li>RAG handles narrative and historical context efficiently</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Requires tool calls to be working before chat quality is high</li>
+            <li>RAG relevance tuning needed to avoid injecting wrong context</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- OPTION B: Full analytics dump in system prompt -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Full Analytics Dump</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%">
+          <div class="context-meter">
+            <div style="font-size:0.62rem;color:#475569;margin-bottom:4px;font-weight:600">Context window usage per request</div>
+            <div class="meter-row">
+              <span class="meter-label">System prompt</span>
+              <div class="meter-bar"><div class="meter-fill" style="width:15%;background:#7c3aed"></div></div>
+              <span class="meter-pct">15%</span>
+            </div>
+            <div class="meter-row">
+              <span class="meter-label">League data dump</span>
+              <div class="meter-bar"><div class="meter-fill" style="width:55%;background:#e11d48"></div></div>
+              <span class="meter-pct">55%</span>
+            </div>
+            <div class="meter-row">
+              <span class="meter-label">Chat history</span>
+              <div class="meter-bar"><div class="meter-fill" style="width:15%;background:#0891b2"></div></div>
+              <span class="meter-pct">15%</span>
+            </div>
+            <div class="meter-row">
+              <span class="meter-label">User message</span>
+              <div class="meter-bar"><div class="meter-fill" style="width:5%;background:#059669"></div></div>
+              <span class="meter-pct">5%</span>
+            </div>
+            <div class="meter-row">
+              <span class="meter-label">Available for reply</span>
+              <div class="meter-bar"><div class="meter-fill" style="width:10%;background:#f59e0b"></div></div>
+              <span class="meter-pct">10%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Serialize all league analytics — standings history, every manager's record, draft grades, matchup results — and inject it into the system prompt on every request. No tools needed, no RAG needed. The model has everything and can answer anything without making additional calls. Sounds great, but a 6-season league with 12 managers produces 8,000–15,000 tokens of data. That's $0.08–0.15 per question just in input tokens, and it fills most of GPT-4o's context window leaving little room for conversation history.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>No tool call latency — model has everything upfront</li>
+            <li>Simplest architecture — just one big prompt, no moving parts</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Very expensive — $0.08–0.15 per message in input tokens alone</li>
+            <li>Fills context window — limits conversation history and reply length</li>
+            <li>Doesn't scale as league history grows</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- OPTION C: RAG-only (no pre-injected context) -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">RAG-Only Context</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="prompt-block">
+<span class="prompt-section">SYSTEM:</span>
+You are a fantasy football analyst.
+Use only the context provided below to answer.
+<span class="prompt-comment">// generic — no league identity injected</span>
+
+<span class="prompt-rag">RAG RETRIEVED (top 5 chunks):</span>
+"2024 Week 7: Frank 142 vs Jake 98..."
+"2023 Draft: Frank picked Tyreek Hill..."
+"2024 standings: Frank 9-5, Jake 8-6..."
+"2022 championship: Frank def. Tyler..."
+"Manager history: Frank joined 2019..."
+
+<span class="prompt-comment">// hope the right 5 chunks cover the question</span>
+        </div>
+      </div>
+      <div class="option-summary">
+        Skip the league header entirely — let the vector search do all the work. When a user asks a question, embed it, find the top-5 most semantically similar chunks from the embedding table, and inject only those. No tools. The system prompt is generic. This is clean and cheap on simple questions, but falls apart on structured stat queries ("what was my best scoring week?") where the right answer requires database aggregation, not text retrieval. RAG alone can't reliably answer questions that need real-time computation.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Questions are narrative/historical ("tell me about season 3")</li>
+            <li>Very low cost per query</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Poor on structured stat queries — wrong chunks get retrieved</li>
+            <li>Model doesn't know who it's talking to without the league header</li>
+            <li>Hallucination risk when the right chunk isn't in the top-5</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- OPTION D: Tool-first (no RAG, no pre-context) -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Tool-First, No RAG</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="prompt-block">
+<span class="prompt-section">SYSTEM:</span>
+You are a fantasy analyst for the
+<span class="prompt-value">BIG12 League</span>. You have these tools:
+
+<span class="prompt-tool">- getStandings(season)</span>
+<span class="prompt-tool">- getMatchups(season, week?, managerId?)</span>
+<span class="prompt-tool">- getDraftResults(season)</span>
+<span class="prompt-tool">- getManagerStats(managerId, season?)</span>
+<span class="prompt-tool">- searchLeagueHistory(query)</span>  <span class="prompt-comment">← does text search</span>
+
+<span class="prompt-comment">// No RAG injection — model calls tools
+// for EVERYTHING, including narrative</span>
+        </div>
+      </div>
+      <div class="option-summary">
+        Forget RAG entirely — give the model a richer set of tools including a <code>searchLeagueHistory(query)</code> tool that runs a database text search when needed. The model decides what to call. This keeps the system prompt lean and makes tool calls the single source of truth. It works well for structured stat questions but creates extra round-trips for every question (even simple ones) and requires a robust search tool to handle anything narrative or historical that RAG would normally cover.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>All answers come from the DB — no stale embedding index to maintain</li>
+            <li>Single source of truth — tools always return current data</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Every question requires at least one tool call — adds latency</li>
+            <li>Narrative/historical queries need a capable search tool to substitute for RAG</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">Option A: Lean + Tools + RAG</th>
+            <th class="col-b">Option B: Full Dump</th>
+            <th class="col-c">Option C: RAG-Only</th>
+            <th class="col-d">Option D: Tools-Only</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Approx. input tokens per question</td>
+            <td class="col-recommended">500–1,500</td>
+            <td>8,000–15,000</td>
+            <td>800–2,000</td>
+            <td>300–800 + tool results</td>
+          </tr>
+          <tr>
+            <td>Stat accuracy</td>
+            <td class="col-recommended">High (tools)</td>
+            <td>High (but static snapshot)</td>
+            <td>Low (RAG may miss)</td>
+            <td>High (tools)</td>
+          </tr>
+          <tr>
+            <td>Narrative / historical accuracy</td>
+            <td class="col-recommended">High (RAG)</td>
+            <td>High</td>
+            <td>Moderate</td>
+            <td>Moderate (depends on search tool)</td>
+          </tr>
+          <tr>
+            <td>Scales with league history growth</td>
+            <td class="col-recommended">Yes</td>
+            <td>No — costs grow linearly</td>
+            <td>Yes</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Hallucination risk</td>
+            <td class="col-recommended">Low</td>
+            <td>Low</td>
+            <td>Moderate</td>
+            <td>Low</td>
+          </tr>
+          <tr>
+            <td>Architecture complexity</td>
+            <td class="col-recommended">Moderate (3 layers)</td>
+            <td>Low</td>
+            <td>Low</td>
+            <td>Low–moderate</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option B but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-027 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

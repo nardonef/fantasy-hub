@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 23: AI Chat Tool Inventory — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.25rem; background: #f8fafc; display: flex; align-items: flex-start; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    /* Tool list styles */
+    .tool-list { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+    .tool-item { background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; }
+    .tool-item.core { border-left: 3px solid #7c3aed; }
+    .tool-item.extended { border-left: 3px solid #0891b2; }
+    .tool-item.semantic { border-left: 3px solid #059669; }
+    .tool-item.router { border-left: 3px solid #f59e0b; }
+    .tool-name { font-family: monospace; font-size: 0.68rem; font-weight: 700; color: #0f172a; }
+    .tool-desc { font-size: 0.62rem; color: #64748b; line-height: 1.3; }
+    .tool-legend { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+    .tool-legend-item { font-size: 0.6rem; display: flex; align-items: center; gap: 4px; color: #475569; }
+    .tool-legend-dot { width: 8px; height: 3px; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 23 of 25</span>
+    <h1>AI Chat Tool Inventory</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      The tool inventory defines exactly what the AI can look up. Each tool maps to a Prisma query that runs against your league data. The Jahnel principles are clear: type your schemas, handle null results explicitly, and design parallel vs. sequential call patterns deliberately. This decision also determines whether tools call the existing V1 analytics endpoints (reuse) or query Prisma directly (more control). The inventory directly maps to progress.md sub-tasks.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option B but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- Option A: Thin wrappers over existing analytics endpoints -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Thin Wrappers Over V1 Endpoints</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="tool-list">
+          <div class="tool-legend">
+            <div class="tool-legend-item"><div class="tool-legend-dot" style="background:#7c3aed;"></div> Calls existing V1 route</div>
+            <div class="tool-legend-item"><div class="tool-legend-dot" style="background:#059669;"></div> pgvector semantic search</div>
+          </div>
+          <div class="tool-item core"><span class="tool-name">get_standings(year?)</span><span class="tool-desc">→ /analytics/standings — season records, ranks, PF/PA</span></div>
+          <div class="tool-item core"><span class="tool-name">get_h2h(manager_a, manager_b?, year?)</span><span class="tool-desc">→ /analytics/h2h — head-to-head records between managers</span></div>
+          <div class="tool-item core"><span class="tool-name">get_scoring(year?)</span><span class="tool-desc">→ /analytics/scoring — avg, max, min PPG per manager</span></div>
+          <div class="tool-item core"><span class="tool-name">get_draft(year)</span><span class="tool-desc">→ /analytics/draft — picks, grades, round/manager grid</span></div>
+          <div class="tool-item core"><span class="tool-name">get_records()</span><span class="tool-desc">→ /analytics/records — champions, top scores, nail biters</span></div>
+          <div class="tool-item core"><span class="tool-name">get_playoffs(year?)</span><span class="tool-desc">→ /analytics/playoffs — clutch ratings, playoff PPG</span></div>
+          <div class="tool-item core"><span class="tool-name">get_manager_profile(manager_id)</span><span class="tool-desc">→ /analytics/dashboard — career stats, rivals, rank history</span></div>
+          <div class="tool-item semantic"><span class="tool-name">search_league_history(query)</span><span class="tool-desc">→ pgvector semantic search across all embeddings</span></div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Each AI tool is a thin wrapper that calls the existing V1 analytics Express routes internally — same Prisma queries, same logic, no duplication. Tools call route handler functions directly (not HTTP), so there's no self-referencing HTTP overhead. The <code>search_league_history</code> tool adds pgvector semantic search on top. This maximally reuses tested V1 code and means fixing a bug in the standings query fixes it for both the iOS analytics view and the AI chat.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Reuses all 8 tested V1 analytics queries — no duplication</li>
+            <li>Bug fixes in V1 routes automatically benefit AI tools</li>
+            <li>Tool inventory maps 1:1 to existing endpoint test coverage</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>V1 route responses shaped for iOS, not necessarily ideal for LLM context</li>
+            <li>Tool can't do cross-query joins (e.g. standings + h2h in one call)</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Direct Prisma tools, AI-optimised responses -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Direct Prisma, AI-Shaped Responses</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="tool-list">
+          <div class="tool-legend">
+            <div class="tool-legend-item"><div class="tool-legend-dot" style="background:#0891b2;"></div> Direct Prisma query</div>
+            <div class="tool-legend-item"><div class="tool-legend-dot" style="background:#059669;"></div> pgvector semantic search</div>
+          </div>
+          <div class="tool-item extended"><span class="tool-name">query_standings(year?, limit?)</span><span class="tool-desc">→ Prisma: returns compact {name, wins, losses, pf, rank}</span></div>
+          <div class="tool-item extended"><span class="tool-name">query_h2h(manager_name_a, manager_name_b)</span><span class="tool-desc">→ Prisma: all-time record + recent 5 matchups</span></div>
+          <div class="tool-item extended"><span class="tool-name">query_scoring_trends(manager_name?, year?)</span><span class="tool-desc">→ Prisma: weekly scores array for trend analysis</span></div>
+          <div class="tool-item extended"><span class="tool-name">query_draft_history(manager_name?, year?)</span><span class="tool-desc">→ Prisma: picks with position, round, value context</span></div>
+          <div class="tool-item extended"><span class="tool-name">query_champions()</span><span class="tool-desc">→ Prisma: champion per year with margin-of-victory</span></div>
+          <div class="tool-item extended"><span class="tool-name">query_manager_stats(manager_name)</span><span class="tool-desc">→ Prisma: career overview, playoff record, rivals</span></div>
+          <div class="tool-item extended"><span class="tool-name">query_transactions(manager_name?, type?, year?)</span><span class="tool-desc">→ Prisma: trades, adds, drops with context</span></div>
+          <div class="tool-item semantic"><span class="tool-name">search_league_history(query)</span><span class="tool-desc">→ pgvector: semantic search across embeddings</span></div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Tools query Prisma directly and return responses shaped for LLM consumption — compact, denormalized, with names instead of IDs. For example, <code>query_h2h</code> returns <code>{"frank vs blake: 23W-18L-0T, last 5: WWLWL"}</code> — the kind of compact summary an LLM can use without further processing. Accepts manager names (not IDs) since users will say "frank" not a UUID. Slightly more work to build but produces better AI answers.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Response shape is optimized for LLM context, not iOS rendering</li>
+            <li>Tools accept natural names ("frank") not internal IDs</li>
+            <li>Cross-cutting queries possible (one tool, multiple relations)</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Duplicates some logic from V1 routes — two places to update on schema changes</li>
+            <li>More code to write and test than Option A</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Minimal tool set (3 tools) -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Minimal Set (3 Tools)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="tool-list">
+          <div class="tool-legend">
+            <div class="tool-legend-item"><div class="tool-legend-dot" style="background:#059669;"></div> Broad SQL query</div>
+            <div class="tool-legend-item"><div class="tool-legend-dot" style="background:#7c3aed;"></div> pgvector</div>
+          </div>
+          <div class="tool-item semantic" style="border-left-color:#059669;"><span class="tool-name">query_stats(category, filters)</span><span class="tool-desc">→ One mega-tool: category = standings|h2h|scoring|draft|records|playoffs</span></div>
+          <div class="tool-item semantic" style="border-left-color:#059669;"><span class="tool-name">get_manager_info(manager_name)</span><span class="tool-desc">→ All career stats for a specific manager in one call</span></div>
+          <div class="tool-item semantic"><span class="tool-name">search_history(query)</span><span class="tool-desc">→ pgvector semantic search — fallback for everything else</span></div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Collapse all stats retrieval into one <code>query_stats(category, filters)</code> mega-tool plus a <code>get_manager_info</code> tool. Simple to define, simple to maintain. The downside: a mega-tool with a <code>category</code> enum is harder for the LLM to use correctly — it has to know the right category to pass. Fine-grained tools are easier for GPT-4o to reason about than one tool with many configurations.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Fastest to implement — 3 tools instead of 8</li>
+            <li>Minimal surface area to maintain</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Mega-tools are harder for LLMs to call correctly than specific tools</li>
+            <li>Can't do parallel tool calls (LLM can't call standings + h2h simultaneously)</li>
+            <li>Error handling is coarser — one tool failing blocks everything</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Option B + router tool -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Option B + Smart Router Tool</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="tool-list">
+          <div class="tool-legend">
+            <div class="tool-legend-item"><div class="tool-legend-dot" style="background:#f59e0b;"></div> Router (cheap model)</div>
+            <div class="tool-legend-item"><div class="tool-legend-dot" style="background:#0891b2;"></div> Direct Prisma</div>
+          </div>
+          <div class="tool-item router"><span class="tool-name">classify_query(question) → tool_names[]</span><span class="tool-desc">→ GPT-4o-mini decides which tools to call before main model runs</span></div>
+          <div class="tool-item extended"><span class="tool-name">query_standings / query_h2h / …</span><span class="tool-desc">→ Same 7 direct Prisma tools as Option B</span></div>
+          <div class="tool-item semantic"><span class="tool-name">search_league_history(query)</span><span class="tool-desc">→ pgvector semantic search</span></div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Same tool set as Option B, but add a lightweight <code>classify_query</code> step first: GPT-4o-mini reads the question and returns the list of tools that should be called, then the full model runs with that pre-selected tool set. This is the Jahnel "small model routing" principle in action — cheaper classification before expensive generation. Reduces token cost per message at scale. Adds ~200ms latency and extra complexity.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>High query volume makes per-message cost meaningful</li>
+            <li>Router prevents main model from calling irrelevant tools</li>
+            <li>Applies Jahnel small-model routing principle directly</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>GPT-4o is already good at tool selection — router may not add much</li>
+            <li>Extra latency + extra API call per message</li>
+            <li>Premature optimization for a personal app with low query volume</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Thin Wrappers</th>
+            <th class="col-b">B: Direct Prisma</th>
+            <th class="col-c">C: Minimal (3 tools)</th>
+            <th class="col-d">D: Direct + Router</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Number of tools</td>
+            <td class="col-recommended">8</td>
+            <td>8</td>
+            <td>3</td>
+            <td>9 (incl. router)</td>
+          </tr>
+          <tr>
+            <td>Data source</td>
+            <td class="col-recommended">Calls existing V1 route functions</td>
+            <td>Direct Prisma queries</td>
+            <td>Direct Prisma (broad)</td>
+            <td>Direct Prisma + mini-model router</td>
+          </tr>
+          <tr>
+            <td>Response shape</td>
+            <td class="col-recommended">V1 iOS format (verbose)</td>
+            <td>Compact, LLM-optimized</td>
+            <td>Compact</td>
+            <td>Compact, LLM-optimized</td>
+          </tr>
+          <tr>
+            <td>Accepts manager names</td>
+            <td class="col-recommended">No — uses IDs from V1 routes</td>
+            <td>Yes — name-to-ID lookup built in</td>
+            <td>Yes</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Code duplication risk</td>
+            <td class="col-recommended">None — reuses V1</td>
+            <td>Medium — parallel query logic</td>
+            <td>Medium</td>
+            <td>Medium</td>
+          </tr>
+          <tr>
+            <td>Parallel tool calls</td>
+            <td class="col-recommended">Yes — LLM calls standings + h2h simultaneously</td>
+            <td>Yes</td>
+            <td>No — mega-tool blocks parallelism</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Null result handling</td>
+            <td class="col-recommended">Must add — V1 routes return 500 on error</td>
+            <td>Explicit per tool</td>
+            <td>One handler for all</td>
+            <td>Explicit per tool</td>
+          </tr>
+          <tr>
+            <td>Implementation effort</td>
+            <td class="col-recommended">Low — refactor V1 into callable functions</td>
+            <td>Medium — new query layer</td>
+            <td>Low</td>
+            <td>High</td>
+          </tr>
+          <tr>
+            <td>Guardrail: no hallucinated stats</td>
+            <td class="col-recommended">Easy — tool returns real data or empty</td>
+            <td>Easy</td>
+            <td>Easy</td>
+            <td>Easy</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option B"</strong>, or <strong>"Option A but [your change]"</strong></p>
+    <p>To change a past decision: <strong>"for decision-023 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

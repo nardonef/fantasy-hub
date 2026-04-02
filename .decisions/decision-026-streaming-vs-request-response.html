@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 26: Streaming vs. Request/Response — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.25rem; background: #f8fafc; display: flex; align-items: flex-start; justify-content: center; flex: 1; min-height: 200px; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    /* Chat bubble mockup */
+    .chat-mockup { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 260px; }
+    .chat-bubble { border-radius: 12px; padding: 8px 12px; font-size: 0.72rem; line-height: 1.5; max-width: 85%; }
+    .chat-bubble.user { background: #c9a96e; color: #1a1a1a; align-self: flex-end; border-bottom-right-radius: 3px; font-weight: 500; }
+    .chat-bubble.ai { background: #2d2d2d; color: #e8e2d6; align-self: flex-start; border-bottom-left-radius: 3px; }
+    .chat-bubble.ai.streaming { background: #2d2d2d; color: #e8e2d6; }
+    .chat-bubble.ai.waiting { background: #2d2d2d; display: flex; align-items: center; gap: 4px; }
+    .typing-dot { width: 6px; height: 6px; background: #64748b; border-radius: 50%; animation: pulse 1.2s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse { 0%,80%,100% { opacity: 0.3; } 40% { opacity: 1; } }
+    .cursor { display: inline-block; width: 2px; height: 12px; background: #c9a96e; animation: blink 0.8s infinite; vertical-align: text-bottom; margin-left: 1px; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+    .timeline-bar { height: 4px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 6px; width: 100%; max-width: 260px; }
+    .timeline-fill { height: 100%; border-radius: 4px; }
+    .timeline-label { font-size: 0.6rem; color: #94a3b8; margin-top: 3px; }
+
+    .flow-container { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem; width: 100%; max-width: 260px; }
+    .flow-step { display: flex; align-items: center; gap: 10px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; padding: 7px 11px; font-size: 0.68rem; font-weight: 600; color: #334155; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .flow-step.highlight { border-color: #6366f1; background: #eff6ff; color: #1d4ed8; }
+    .flow-step-number { width: 20px; height: 20px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; flex-shrink: 0; }
+    .flow-step.highlight .flow-step-number { background: #6366f1; color: white; }
+    .flow-step-label { flex: 1; }
+    .flow-down-arrow { font-size: 0.9rem; color: #94a3b8; padding: 2px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 26 of 28</span>
+    <h1>Streaming vs. Request / Response</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      GPT-4o can start sending words back before it's finished thinking — like watching someone type in real time. Or it can think silently and then send the whole answer at once. This affects how the Express API is written, how the iOS app handles the response, and — most importantly — how the chat feels to use. A complex fantasy question with tool calls can take 5–8 seconds. What happens during that wait matters a lot.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- OPTION A: SSE Streaming (Recommended) -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">SSE Token Streaming</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%">
+          <div class="chat-mockup">
+            <div class="chat-bubble user">Who was my best manager last season?</div>
+            <div class="chat-bubble ai streaming">Based on your 2024 season, <strong>Frank</strong> led all managers with 1,847 total pts and a .714 win rate across 14 week<span class="cursor"></span></div>
+          </div>
+          <div class="timeline-bar" style="margin-top:4px">
+            <div class="timeline-fill" style="width:65%;background:linear-gradient(90deg,#7c3aed,#c9a96e)"></div>
+          </div>
+          <div class="timeline-label">tokens arrive continuously — first word in ~800ms</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        The Express API sets <code>Content-Type: text/event-stream</code> and pipes OpenAI's streaming response directly to the client. On iOS, URLSession reads the response byte-by-byte using <code>AsyncBytes</code>, appending each token to the message as it arrives — the same typewriter effect you see in ChatGPT. The user sees the first word almost immediately, even for long answers. When tools are called mid-response, you can show a "looking up your stats…" indicator while the tool runs.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Answers are long — streaming fills the wait naturally</li>
+            <li>Tool calls happen mid-response (show progress indicators)</li>
+            <li>This is what users expect from modern chat AI</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>More complex iOS code — need to handle chunked byte stream</li>
+            <li>Saving the final message to DB requires accumulating the full stream</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- OPTION B: Full response wait -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Wait for Full Response</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%">
+          <div class="chat-mockup">
+            <div class="chat-bubble user">Who was my best manager last season?</div>
+            <div class="chat-bubble ai waiting">
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+            </div>
+          </div>
+          <div class="timeline-bar" style="margin-top:4px">
+            <div class="timeline-fill" style="width:100%;background:#e2e8f0"></div>
+          </div>
+          <div class="timeline-label" style="color:#e11d48">silence for 5–8s, then full answer appears</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Standard POST request — Express calls OpenAI with <code>stream: false</code>, waits for the complete response, then returns it as JSON. iOS gets the whole answer at once and displays it immediately. Much simpler to implement on both sides. The downside is that for a question requiring tool calls (e.g., "look up my 2023 draft grades and compare to final standings"), the user stares at a spinner for 5–8 seconds with no indication of progress.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Simplest implementation — standard JSON POST/response</li>
+            <li>No complex byte-stream handling on iOS</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>5–8s blank spinner is a bad experience for tool-heavy queries</li>
+            <li>iOS URLSession may timeout on slow GPT responses</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- OPTION C: Streaming with tool call phase indicators -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Stream + Phase Events</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">User sends message</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">SSE event: <code>phase: "thinking"</code></span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">SSE event: <code>phase: "tool_call"</code> → "Fetching your standings…"</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">SSE tokens: answer streams in</span>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        An extension of Option A — the SSE stream sends both token chunks and structured phase events. When GPT-4o decides to call a tool, the server emits a <code>data: {"type":"tool_call","name":"getStandings"}</code> event before the tool runs, which iOS can use to show a contextual indicator like "Looking up your standings…". This is the most polished UX — the user always knows what's happening. It's also the most complex to implement.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Queries regularly involve multiple tool calls</li>
+            <li>You want a premium, transparent UX</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Most complex of all options — custom event protocol on top of SSE</li>
+            <li>iOS needs to parse both token chunks and structured events in the same stream</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- OPTION D: WebSocket -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">WebSocket Connection</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;max-width:260px">
+          <div style="background:#1e293b;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:0.62rem;color:#e2e8f0;width:100%;line-height:1.8">
+            <span style="color:#7dd3fc">ws://</span><span style="color:#c9a96e">api/chat</span>
+            <br><span style="color:#86efac">← OPEN persistent connection</span>
+            <br><span style="color:#94a3b8">→ send: { message: "..." }</span>
+            <br><span style="color:#86efac">← recv: { token: "Based" }</span>
+            <br><span style="color:#86efac">← recv: { token: " on" }</span>
+            <br><span style="color:#86efac">← recv: { token: " your..." }</span>
+            <br><span style="color:#86efac">← recv: { done: true }</span>
+          </div>
+          <div class="timeline-label">bidirectional — connection stays open</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use WebSockets (via <code>ws</code> npm package) to maintain a persistent connection between iOS and Express. The client sends messages as JSON frames and receives token frames back in real time. WebSockets are designed for bidirectional real-time communication — but this is a one-direction streaming problem. You're adding significant infrastructure complexity (connection lifecycle, reconnection logic, iOS URLSessionWebSocketTask) for no benefit over SSE, which was built exactly for this use case.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You need server-to-client AND client-to-server real-time events</li>
+            <li>Multiple simultaneous live updates (not this use case)</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Overkill — SSE is simpler and purpose-built for one-way streaming</li>
+            <li>Connection lifecycle management adds significant complexity</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">Option A: SSE Streaming</th>
+            <th class="col-b">Option B: Full Response</th>
+            <th class="col-c">Option C: Stream + Events</th>
+            <th class="col-d">Option D: WebSocket</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Time to first word</td>
+            <td class="col-recommended">~800ms</td>
+            <td>5–8s (full wait)</td>
+            <td>~800ms</td>
+            <td>~800ms</td>
+          </tr>
+          <tr>
+            <td>Tool call transparency</td>
+            <td class="col-recommended">Partial (can show spinner)</td>
+            <td>None</td>
+            <td>Full (named indicators)</td>
+            <td>Partial</td>
+          </tr>
+          <tr>
+            <td>iOS implementation</td>
+            <td class="col-recommended">AsyncBytes (moderate)</td>
+            <td>Standard URLSession (easy)</td>
+            <td>Custom event parser (complex)</td>
+            <td>URLSessionWebSocketTask (complex)</td>
+          </tr>
+          <tr>
+            <td>Express implementation</td>
+            <td class="col-recommended">SSE headers + pipe stream</td>
+            <td>Standard JSON response</td>
+            <td>SSE + event protocol</td>
+            <td>ws package + lifecycle</td>
+          </tr>
+          <tr>
+            <td>Perceived UX quality</td>
+            <td class="col-recommended">Excellent</td>
+            <td>Poor for long answers</td>
+            <td>Best</td>
+            <td>Excellent</td>
+          </tr>
+          <tr>
+            <td>Implementation complexity</td>
+            <td class="col-recommended">Moderate</td>
+            <td>Low</td>
+            <td>High</td>
+            <td>High</td>
+          </tr>
+          <tr>
+            <td>Right tool for the job</td>
+            <td class="col-recommended">Yes — SSE is built for this</td>
+            <td>Yes — simplest is fine</td>
+            <td>Yes, but over-engineered</td>
+            <td>No — wrong protocol</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option B but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-026 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

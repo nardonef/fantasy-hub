@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision Hub — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+
+    .project-description {
+      font-size: 1rem;
+      color: #475569;
+      margin-top: 0.5rem;
+    }
+
+    .progress-section {
+      margin: 1.5rem 0;
+    }
+
+    .progress-label {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #059669;
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    .phase-divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 1.5rem 0 1rem;
+    }
+
+    .phase-divider span {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .phase-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+
+    .decision-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .decision-item {
+      background: white;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 2px solid #e2e8f0;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    .decision-item:hover {
+      border-color: #6366f1;
+    }
+
+    .decision-item.resolved {
+      border-left: 4px solid #059669;
+    }
+
+    .decision-item.pending {
+      border-left: 4px solid #f59e0b;
+    }
+
+    .decision-number-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .decision-item.resolved .decision-number-badge {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .decision-item.pending .decision-number-badge {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .decision-info {
+      flex: 1;
+    }
+
+    .decision-info h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .decision-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.3rem;
+      flex-wrap: wrap;
+    }
+
+    .landing-category-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .landing-category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .landing-category-badge.visual { background: #fce7f3; color: #be185d; }
+    .landing-category-badge.interaction { background: #e0f2fe; color: #0369a1; }
+    .landing-category-badge.ia { background: #ecfdf5; color: #047857; }
+
+    .decision-status {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .decision-status .chosen-text {
+      color: #059669;
+      font-weight: 600;
+    }
+
+    .decision-status .pending-text {
+      color: #d97706;
+      font-weight: 600;
+    }
+
+    .decision-summary {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+    }
+
+    .arrow-icon {
+      color: #94a3b8;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .footer-note {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Decision Hub</h1>
+      <p class="project-description">Fantasy League Hub — Multi-platform fantasy football analytics with intelligence platform</p>
+    </header>
+
+    <div class="progress-section">
+      <div class="progress-label">
+        <span>24 of 27 decisions made</span>
+        <span>89%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: 89%"></div>
+      </div>
+    </div>
+
+    <!-- V1 Decisions -->
+    <div class="phase-divider"><span>V1 — Core Analytics (Complete)</span></div>
+
+    <div class="decision-list">
+      <a href="decision-001-platform-frontend-stack.html" class="decision-item resolved">
+        <div class="decision-number-badge">1</div>
+        <div class="decision-info">
+          <h3>Platform & Frontend Stack</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — SwiftUI Native</span></span>
+          </div>
+          <p class="decision-summary">What we build the UI with and how users access the app</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-002-backend-api-architecture.html" class="decision-item resolved">
+        <div class="decision-number-badge">2</div>
+        <div class="decision-info">
+          <h3>Backend & API Architecture</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Node.js Express API</span></span>
+          </div>
+          <p class="decision-summary">Server framework, API style, and deployment strategy</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-003-database-data-modeling.html" class="decision-item resolved">
+        <div class="decision-number-badge">3</div>
+        <div class="decision-info">
+          <h3>Database & Data Modeling</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — PostgreSQL + Prisma ORM</span></span>
+          </div>
+          <p class="decision-summary">How multi-provider league data is stored and queried</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-004-provider-integration.html" class="decision-item resolved">
+        <div class="decision-number-badge">4</div>
+        <div class="decision-info">
+          <h3>Provider Integration Strategy</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Adapter Pattern + Job Queue</span></span>
+          </div>
+          <p class="decision-summary">How we connect to Yahoo, ESPN, and Sleeper and keep data in sync</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-005-auth-multi-tenancy.html" class="decision-item resolved">
+        <div class="decision-number-badge">5</div>
+        <div class="decision-info">
+          <h3>Auth & Multi-Tenancy</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Clerk + Custom League Permissions</span></span>
+          </div>
+          <p class="decision-summary">User accounts, league sharing, and permissions</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-006-ai-chat-architecture.html" class="decision-item resolved">
+        <div class="decision-number-badge">6</div>
+        <div class="decision-info">
+          <h3>AI/Chat Architecture</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — RAG + Tool Use (pgvector)</span></span>
+          </div>
+          <p class="decision-summary">LLM integration, context building, and how the AI understands league history</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-007-visual-direction.html" class="decision-item resolved">
+        <div class="decision-number-badge">7</div>
+        <div class="decision-info">
+          <h3>Visual Direction</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge visual">Visual</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Broadcast Dark + Trophy Gold</span></span>
+          </div>
+          <p class="decision-summary">The overall look, feel, and personality of the app</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-008-navigation-app-structure.html" class="decision-item resolved">
+        <div class="decision-number-badge">8</div>
+        <div class="decision-info">
+          <h3>Navigation & App Structure</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge ia">Information Architecture</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — League-First Tab Bar</span></span>
+          </div>
+          <p class="decision-summary">How users find their way around all the data and features</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-009-onboarding-league-connection.html" class="decision-item resolved">
+        <div class="decision-number-badge">9</div>
+        <div class="decision-info">
+          <h3>Onboarding & League Connection Flow</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge interaction">Interaction</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Progressive Reveal</span></span>
+          </div>
+          <p class="decision-summary">First-time experience from signup to seeing analytics</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-010-analytics-dashboard-ux.html" class="decision-item resolved">
+        <div class="decision-number-badge">10</div>
+        <div class="decision-info">
+          <h3>Analytics Dashboard UX</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge interaction">Interaction</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Scrollable Category Sections</span></span>
+          </div>
+          <p class="decision-summary">How deep analytics are surfaced and explored</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-011-ai-chat-experience.html" class="decision-item resolved">
+        <div class="decision-number-badge">11</div>
+        <div class="decision-info">
+          <h3>AI Chat Experience</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge interaction">Interaction</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Full-Screen Chat + Contextual Triggers</span></span>
+          </div>
+          <p class="decision-summary">How the conversational AI assistant interface works</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-012-phased-delivery.html" class="decision-item resolved">
+        <div class="decision-number-badge">12</div>
+        <div class="decision-info">
+          <h3>Phased Delivery Strategy</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge interaction">Interaction</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Analytics-First Launch</span></span>
+          </div>
+          <p class="decision-summary">What ships in v1 vs v2 vs v3</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+    </div>
+
+    <!-- V2 Decisions -->
+    <div class="phase-divider"><span>V2 — Fantasy Intelligence Platform</span></div>
+
+    <div class="decision-list">
+      <a href="decision-013-ingestion-data-model.html" class="decision-item resolved">
+        <div class="decision-number-badge">13</div>
+        <div class="decision-info">
+          <h3>Ingestion Data Model</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option B — Typed Signal Family</span></span>
+          </div>
+          <p class="decision-summary">How to model signals, players, and sources in Prisma for the intelligence layer</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-014-data-source-apis.html" class="decision-item resolved">
+        <div class="decision-number-badge">14</div>
+        <div class="decision-info">
+          <h3>Data Source APIs</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Custom — Free & Documented</span></span>
+          </div>
+          <p class="decision-summary">Which specific APIs and services to use for Reddit, Twitter, NFL stats, and rankings ingestion</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-015-player-resolution-strategy.html" class="decision-item resolved">
+        <div class="decision-number-badge">15</div>
+        <div class="decision-info">
+          <h3>Player Resolution Strategy</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Alias Table + Exact-First</span></span>
+          </div>
+          <p class="decision-summary">How fuzzy matching resolves raw player names to canonical player identities</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-016-navigation-integration.html" class="decision-item resolved">
+        <div class="decision-number-badge">16</div>
+        <div class="decision-info">
+          <h3>Navigation Integration</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge ia">Information Architecture</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option B — Add Sixth Tab</span></span>
+          </div>
+          <p class="decision-summary">Where Feed, Recommendations, and Player Detail live in the existing 5-tab navigation</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+    </div>
+
+    <!-- V2 AI + Social Decisions -->
+    <div class="phase-divider"><span>V2 — AI + Social</span></div>
+
+    <div class="decision-list">
+      <a href="decision-020-v2-sub-phasing.html" class="decision-item resolved">
+        <div class="decision-number-badge">20</div>
+        <div class="decision-info">
+          <h3>V2 Sub-Phasing & Build Order</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — AI First, Social Second</span></span>
+          </div>
+          <p class="decision-summary">Internal phases within V2, dependency ordering, and shippable milestones</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+      <a href="decision-021-llm-provider.html" class="decision-item resolved">
+        <div class="decision-number-badge">21</div>
+        <div class="decision-info">
+          <h3>LLM Provider & SDK</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option B — OpenAI (GPT-4o)</span></span>
+          </div>
+          <p class="decision-summary">Which LLM powers the AI chat, which SDK to use, and which embedding model feeds pgvector</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+    </div>
+
+      <a href="decision-023-tool-inventory.html" class="decision-item resolved">
+        <div class="decision-number-badge">23</div>
+        <div class="decision-info">
+          <h3>AI Chat Tool Inventory</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Thin Wrappers Over V1 Endpoints</span></span>
+          </div>
+          <p class="decision-summary">Which tools the LLM can call, what they query, and whether they reuse V1 routes or hit Prisma directly</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+      <a href="decision-022-embedding-strategy.html" class="decision-item resolved">
+        <div class="decision-number-badge">22</div>
+        <div class="decision-info">
+          <h3>Embedding Strategy & pgvector Schema</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Dedicated Embedding Table</span></span>
+          </div>
+          <p class="decision-summary">What gets embedded, how it's chunked, and where vectors live in the Prisma schema</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+    </div>
+
+    <!-- AI Chat Decisions (Active) -->
+    <div class="phase-divider"><span>V2 AI Chat — Active Planning</span></div>
+
+    <div class="decision-list">
+      <a href="decision-025-conversation-history-storage.html" class="decision-item resolved">
+        <div class="decision-number-badge">25</div>
+        <div class="decision-info">
+          <h3>Conversation History Storage</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Persistent DB Threads</span></span>
+          </div>
+          <p class="decision-summary">Where chat threads and messages live in Prisma, and whether history persists across sessions</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-026-streaming-vs-request-response.html" class="decision-item resolved">
+        <div class="decision-number-badge">26</div>
+        <div class="decision-info">
+          <h3>Streaming vs. Request / Response</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — SSE Token Streaming</span></span>
+          </div>
+          <p class="decision-summary">Whether GPT-4o tokens stream in real time via SSE or iOS waits for a complete response</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-027-system-prompt-context-injection.html" class="decision-item resolved">
+        <div class="decision-number-badge">27</div>
+        <div class="decision-info">
+          <h3>System Prompt &amp; League Context Injection</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge technical">Technical</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option A — Lean Header + Tools + RAG</span></span>
+          </div>
+          <p class="decision-summary">What goes in the system prompt, when RAG vs tools are used, and how to prevent context bloat</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-028-conversation-threading-model.html" class="decision-item resolved">
+        <div class="decision-number-badge">28</div>
+        <div class="decision-info">
+          <h3>Conversation Threading Model</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge interaction">Interaction</span>
+            <span class="decision-status"><span class="chosen-text">Chosen: Option D — User-Named Threads</span></span>
+          </div>
+          <p class="decision-summary">Whether conversations are scoped per league, ephemeral, or user-managed threads</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+    </div>
+
+    <!-- Intelligence Platform Decisions (On Pause) -->
+    <div class="phase-divider"><span>V2 Intelligence Platform (On Pause)</span></div>
+
+    <div class="decision-list">
+      <a href="decision-017-feed-view-design.html" class="decision-item pending">
+        <div class="decision-number-badge">17</div>
+        <div class="decision-info">
+          <h3>Feed View Design</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge visual">Visual</span>
+            <span class="decision-status"><span class="pending-text">Pending</span></span>
+          </div>
+          <p class="decision-summary">Visual treatment and filtering UX for the social/news feed</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-018-recommendations-card-design.html" class="decision-item pending">
+        <div class="decision-number-badge">18</div>
+        <div class="decision-info">
+          <h3>Recommendations Card Design</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge visual">Visual</span>
+            <span class="decision-status"><span class="pending-text">Pending</span></span>
+          </div>
+          <p class="decision-summary">How waiver buzz and start/sit signals are presented as actionable cards</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+
+      <a href="decision-019-player-detail-layout.html" class="decision-item pending">
+        <div class="decision-number-badge">19</div>
+        <div class="decision-info">
+          <h3>Player Detail Layout</h3>
+          <div class="decision-meta">
+            <span class="landing-category-badge interaction">Interaction</span>
+            <span class="decision-status"><span class="pending-text">Pending</span></span>
+          </div>
+          <p class="decision-summary">How to compose sentiment, rankings, social mentions, and stats into one scrollable player view</p>
+        </div>
+        <span class="arrow-icon">&rarr;</span>
+      </a>
+    </div>
+
+    <p class="footer-note">
+      To change a decision, tell Claude: "for decision-013 I want Option B instead"
+    </p>
+  </div>
+</body>
+</html>

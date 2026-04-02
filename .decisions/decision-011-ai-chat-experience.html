@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 11: AI Chat Experience — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.interaction { background: #e0f2fe; color: #0369a1; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; max-width: 1200px; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .flow-container { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem; width: 100%; max-width: 280px; }
+    .flow-step { display: flex; align-items: center; gap: 10px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .flow-step.highlight { border-color: #6366f1; background: #eff6ff; color: #1d4ed8; }
+    .flow-step-number { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; flex-shrink: 0; }
+    .flow-step.highlight .flow-step-number { background: #6366f1; color: white; }
+    .flow-step-label { flex: 1; }
+    .flow-down-arrow { font-size: 1rem; color: #94a3b8; padding: 2px 0; text-align: center; }
+    .flow-branch-label { font-size: 0.6rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; text-align: center; padding: 6px 0 2px; border-top: 1px dashed #cbd5e1; margin-top: 4px; }
+
+    /* Chat mockup styles */
+    .chat-mockup { width: 100%; max-width: 300px; }
+    .chat-bubble { padding: 8px 12px; border-radius: 12px; font-size: 0.7rem; line-height: 1.5; margin-bottom: 6px; max-width: 85%; }
+    .chat-bubble.user { background: #c9a96e; color: #1a1a1a; margin-left: auto; border-bottom-right-radius: 4px; font-weight: 600; }
+    .chat-bubble.ai { background: #2a2a2a; color: #e8e2d6; margin-right: auto; border-bottom-left-radius: 4px; }
+    .chat-bubble .stat-inline { color: #c9a96e; font-weight: 700; }
+    .chat-typing { display: flex; gap: 4px; padding: 8px 12px; background: #2a2a2a; border-radius: 12px; border-bottom-left-radius: 4px; width: fit-content; }
+    .chat-typing span { width: 6px; height: 6px; background: #64748b; border-radius: 50%; }
+    .suggestion-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+    .suggestion-pill { padding: 4px 10px; border-radius: 999px; font-size: 0.6rem; font-weight: 600; border: 1.5px solid #c9a96e; color: #c9a96e; background: transparent; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 11 of 12</span>
+    <h1>AI Chat Experience</h1>
+    <span class="category-badge interaction">Interaction</span>
+    <p class="decision-description">
+      You've already decided on RAG + Tool Use (Decision 6) for the AI backend. This decision is about the front-end experience — what the chat feels like to use. How does a user start a conversation? What does the AI respond with — just text, or rich cards with charts and data? How does it handle follow-ups? And critically: does the AI feel like a separate "chat feature" bolted on, or is it woven into the whole app — accessible from analytics screens, player pages, and the dashboard? The chat UI defines whether this feels like a gimmick or a genuine league intelligence tool.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Dedicated Chat Tab -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Full-Screen Chat + Contextual Triggers</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="chat-mockup">
+          <div class="chat-bubble user">Who has the best record against me all-time?</div>
+          <div class="chat-bubble ai">Across all seasons, <span class="stat-inline">Mike is 14-6</span> against you — the most dominant head-to-head record in the league. His wins cluster in weeks 8-13, suggesting his late-season rosters consistently outperform yours.</div>
+          <div class="chat-bubble ai" style="font-size: 0.6rem; background: #333; padding: 6px 10px;">
+            <div style="color: #c9a96e; font-weight: 700; margin-bottom: 2px;">YOUR H2H vs MIKE</div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: #64748b;">Your wins</span><span style="color: #e8e2d6;">6</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: #64748b;">Mike's wins</span><span style="color: #c9a96e;">14</span>
+            </div>
+            <div style="margin-top: 4px; height: 4px; background: #444; border-radius: 2px; overflow: hidden;">
+              <div style="width: 30%; height: 100%; background: #e8e2d6;"></div>
+            </div>
+          </div>
+          <div class="suggestion-pills">
+            <span class="suggestion-pill">Show me Mike's drafts</span>
+            <span class="suggestion-pill">Luck index comparison</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        The AI Chat tab (the third tab in the nav bar) opens to a full-screen conversational interface. The chat shows rich responses — not just text, but inline stat cards, mini charts, and data tables rendered natively in SwiftUI. After each response, the AI suggests 2-3 follow-up questions as tappable pills. The key differentiator: contextual triggers throughout the app. On any analytics screen, a small "Ask AI" button lets you start a chat pre-loaded with that context. Viewing head-to-head records? Tap "Ask AI" and the chat opens with "Tell me about the Frank vs Mike rivalry" already seeded. I recommend this because it gives the AI a dedicated home for deep conversations while making it accessible everywhere — best of both worlds.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Full screen means room for rich responses with charts and tables</li>
+            <li>Contextual "Ask AI" buttons make the chat feel integrated, not siloed</li>
+            <li>Follow-up pills guide users who don't know what to ask</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Switching to the chat tab loses your place in analytics</li>
+            <li>Users might not discover the "Ask AI" triggers on other screens</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Floating Assistant Sheet -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Slide-Up Assistant Sheet</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Tap floating button on any screen</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Half-sheet slides up over current view</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">AI already knows what screen you're on</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Ask a question — response appears in sheet</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Drag up for full-screen, swipe down to dismiss</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        No dedicated chat tab at all. Instead, a floating action button (FAB) appears on every screen. Tap it and a half-sheet slides up from the bottom — the AI is instantly available without leaving your current context. The AI automatically knows what you're looking at (which analytics screen, which manager profile, which matchup). You can drag the sheet to full-screen for longer conversations or swipe it down to dismiss. This is the Apple Maps / Shazam pattern — the assistant is a layer on top of the app, not a separate destination. The trade-off: less room for rich responses in the half-sheet view, and the FAB takes up screen real estate.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Zero context switching — ask without leaving your screen</li>
+            <li>AI auto-knows what you're looking at</li>
+            <li>Feels like a native iOS assistant, not a chat app</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Half-sheet has limited space for rich responses</li>
+            <li>FAB can obscure content on smaller screens</li>
+            <li>Long conversations get awkward in an overlay</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Command Bar -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Spotlight Command Bar</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step highlight">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Pull down from top of any screen</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Search bar appears with recent queries</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">Type natural language or search terms</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Inline result card with answer + data</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Tap to navigate to relevant analytics view</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Instead of a chat interface, use a Spotlight-style command bar. Pull down from the top of any screen (like iOS Spotlight) and type anything — natural language queries, player names, stat lookups. Results appear as compact answer cards: "Mike's all-time record: 87-63" with a link to the full H2H view. It's more search engine than chatbot — optimized for quick lookups rather than conversations. There's no conversation history; each query is standalone. This is the fastest path to a specific answer, but it doesn't support the back-and-forth that makes AI feel intelligent. Think of it as a league search engine powered by AI, not a conversational assistant.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Fastest path from question to answer — no chat overhead</li>
+            <li>Familiar iOS Spotlight gesture</li>
+            <li>Doubles as universal search for the app</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>No conversation — can't do follow-ups like "now compare that to 2022"</li>
+            <li>Complex questions need multiple lookups</li>
+            <li>Misses the narrative/storytelling potential of conversational AI</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Proactive Feed + Chat -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Proactive Narrative Feed</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="chat-mockup">
+          <div style="padding: 6px 0;">
+            <div style="font-size: 0.55rem; font-weight: 700; color: #c9a96e; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;">THIS WEEK'S STORYLINES</div>
+          </div>
+          <div class="chat-bubble ai">
+            <div style="color: #c9a96e; font-weight: 700; font-size: 0.65rem; margin-bottom: 2px;">RIVALRY WATCH</div>
+            Frank vs Mike — Week 8 rematch. Mike has won 3 straight, but Frank's roster is peaking at the right time. Here's why this week is different...
+          </div>
+          <div class="chat-bubble ai">
+            <div style="color: #c9a96e; font-weight: 700; font-size: 0.65rem; margin-bottom: 2px;">DRAFT REPORT CARD</div>
+            Mid-season draft grades are in. Sarah's early-round strategy is paying dividends — her picks are <span class="stat-inline">outscoring ADP by 23%</span>.
+          </div>
+          <div style="border-top: 1px dashed #444; margin: 8px 0; padding-top: 8px;">
+            <div style="font-size: 0.55rem; color: #64748b; text-align: center;">Tap any story to chat about it</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        The AI tab isn't a blank chat — it's a curated narrative feed. Each week, the AI writes storylines: rivalry previews, power ranking commentary, draft grade updates, milestone alerts, and season recaps. These read like a fantasy column written by someone who knows your league intimately. Tap any narrative to enter a conversational thread about that topic. You can also type a fresh question at the bottom. This flips the dynamic: instead of the user always initiating, the AI proactively tells you what's interesting. The risk is that if the narratives aren't compelling, the whole tab feels like AI-generated filler.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>AI initiates — users don't need to know what to ask</li>
+            <li>Weekly storylines create appointment engagement</li>
+            <li>Narratives are highly shareable in league group chats</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Higher LLM cost — generating narratives proactively</li>
+            <li>Quality bar is very high — bad narratives feel like spam</li>
+            <li>Specific stat lookups are buried under the feed</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Full Chat + Triggers</th>
+            <th class="col-b">B: Slide-Up Sheet</th>
+            <th class="col-c">C: Command Bar</th>
+            <th class="col-d">D: Narrative Feed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Speed to Answer</td>
+            <td class="col-recommended">Medium — navigate to chat tab</td>
+            <td>Fast — tap FAB anywhere</td>
+            <td>Fastest — pull down and type</td>
+            <td>Slow — browse feed or type</td>
+          </tr>
+          <tr>
+            <td>Conversation Depth</td>
+            <td class="col-recommended">Best — full-screen multi-turn chat</td>
+            <td>Good — expandable sheet</td>
+            <td>None — single query/response</td>
+            <td>Good — threaded from narratives</td>
+          </tr>
+          <tr>
+            <td>Rich Responses (Charts, Tables)</td>
+            <td class="col-recommended">Best — full screen for SwiftUI components</td>
+            <td>Limited — half-sheet is cramped</td>
+            <td>Compact — answer cards only</td>
+            <td>Good — narrative cards with inline data</td>
+          </tr>
+          <tr>
+            <td>Context Awareness</td>
+            <td class="col-recommended">Good — "Ask AI" buttons pass context</td>
+            <td>Best — auto-reads current screen</td>
+            <td>None — standalone queries</td>
+            <td>Medium — AI picks topics proactively</td>
+          </tr>
+          <tr>
+            <td>User Activation (Getting People to Use It)</td>
+            <td class="col-recommended">Good — dedicated tab + triggers</td>
+            <td>High — visible FAB on every screen</td>
+            <td>Medium — gesture needs discovery</td>
+            <td>Highest — content appears without asking</td>
+          </tr>
+          <tr>
+            <td>Feels "Native iOS"</td>
+            <td class="col-recommended">Good — standard chat pattern</td>
+            <td>Best — Maps-style sheet</td>
+            <td>Best — Spotlight-style gesture</td>
+            <td>Good — feed is familiar</td>
+          </tr>
+          <tr>
+            <td>LLM Cost</td>
+            <td class="col-recommended">On-demand — user-initiated</td>
+            <td>On-demand — user-initiated</td>
+            <td>Lowest — single responses</td>
+            <td>Highest — proactive generation</td>
+          </tr>
+          <tr>
+            <td>Build Complexity</td>
+            <td class="col-recommended">Medium — chat UI + trigger system</td>
+            <td>Medium — sheet + screen context reading</td>
+            <td>Low — search bar + result cards</td>
+            <td>High — narrative engine + scheduling</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

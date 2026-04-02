@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 9: Onboarding & League Connection Flow — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.interaction { background: #e0f2fe; color: #0369a1; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; max-width: 1200px; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .flow-container { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem; width: 100%; max-width: 280px; }
+    .flow-step { display: flex; align-items: center; gap: 10px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .flow-step.highlight { border-color: #6366f1; background: #eff6ff; color: #1d4ed8; }
+    .flow-step-number { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; flex-shrink: 0; }
+    .flow-step.highlight .flow-step-number { background: #6366f1; color: white; }
+    .flow-step-label { flex: 1; }
+    .flow-down-arrow { font-size: 1rem; color: #94a3b8; padding: 2px 0; text-align: center; }
+    .flow-branch-label { font-size: 0.6rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; text-align: center; padding: 6px 0 2px; border-top: 1px dashed #cbd5e1; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 9 of 12</span>
+    <h1>Onboarding & League Connection Flow</h1>
+    <span class="category-badge interaction">Interaction</span>
+    <p class="decision-description">
+      The first 60 seconds of the app determine whether someone sticks around or deletes it. A new user needs to sign up, connect at least one fantasy league (which means OAuth with Yahoo, cookies with ESPN, or a league ID for Sleeper), wait for historical data to import, and then see something that makes them go "whoa, I didn't know that about my league." The challenge is that connecting a provider can be friction-heavy (especially Yahoo OAuth), and the initial data import takes time. How do you keep users engaged through that wait?
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Progressive Reveal -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Progressive Reveal</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Sign up (Apple Sign-In, 1 tap)</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Pick provider: Yahoo / ESPN / Sleeper</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">OAuth / connect (provider-specific)</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Pick league(s) from discovered list</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Land on dashboard — stats appear as they import</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">6</span>
+            <span class="flow-step-label">Quick wins animate in: record, rival, best week</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Get the user to their dashboard as fast as possible, then progressively fill it in as data imports. In step 2, they pick a provider and connect. Step 4 shows all leagues found on their account — they pick which to import. Then immediately drop them on the dashboard (step 5). Current season data loads first (seconds), then historical seasons import in the background. As each season finishes importing, new stats and insights animate onto the dashboard — "You've won 3 championships," "Your longest win streak is 8 games," "Your biggest rival is Mike (14-9 all-time)." The progressive reveal turns the wait into a drip of dopamine hits. I recommend this because the user sees value immediately and each new insight keeps them hooked while the full import completes.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>User sees value within 30 seconds of connecting</li>
+            <li>Progressive reveals turn the wait into excitement</li>
+            <li>Current season loads fast — historical is bonus, not blocker</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Dashboard needs to look good partially loaded (skeleton states)</li>
+            <li>Analytics that need full history show "importing..." temporarily</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Import First, Explore After -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Import First, Wow After</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Sign up + connect provider</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Pick league(s) to import</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">Animated import screen with fun facts</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">"Your league is ready" push notification</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Full dashboard — everything loaded at once</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Make the user wait for the full import, but make the wait entertaining. Step 3 is a dedicated import screen with an animated progress bar, and as each season loads, fun facts pop up: "Importing 2019... found 247 transactions" or "2021 championship game: you won by 0.3 points!" When the import finishes (or if they leave and come back), they land on a fully loaded dashboard with all history — no partial states, no "importing..." badges. The push notification (step 4) re-engages users who left during import. The trade-off is a longer time to first value, but when they do see the dashboard it's the full experience.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>First impression is the complete experience — nothing half-loaded</li>
+            <li>Fun facts during import build anticipation</li>
+            <li>Push notification re-engages users who leave during import</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Users may abandon during the wait (minutes for deep history)</li>
+            <li>Import screen needs to be genuinely entertaining</li>
+            <li>Higher drop-off risk than progressive reveal</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Sleeper-Style Link -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">League Link / Invite First</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step highlight">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Receive invite link from leaguemate</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">See league preview (no sign-up yet)</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">Sign up to claim your manager profile</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Connect provider to unlock your personal stats</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Full dashboard — league already imported</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Flip the flow: instead of "sign up then connect," start with an invite link from someone who's already in the app. In step 1, a leaguemate shares a link. Step 2 shows a preview of the league — standings, some stats, the AI's take on the season — all without requiring sign-up. Then the user signs up (step 3) to claim their manager profile within that league, and optionally connects their provider (step 4) to unlock personal stats and other leagues. The league data is already imported because the person who invited them already connected it. This is the viral growth model — each user brings their whole league.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Viral growth — one user imports league, invites 11 leaguemates</li>
+            <li>Zero wait for invited users — league is already imported</li>
+            <li>Preview before sign-up reduces friction</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>First user in a league still has the full import experience</li>
+            <li>Doesn't work for users who discover the app solo</li>
+            <li>Requires building the invite/preview infrastructure</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Demo Mode First -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Demo League First</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step highlight">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Open app — instantly see demo league</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Explore analytics, chat with AI, browse stats</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">"See your own league" prompt</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Sign up + connect provider</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Import runs — already know the app</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Let users play with the app before they sign up. Step 1: open the app and immediately land in a pre-loaded demo league with 10 years of realistic history. They can explore analytics, try the AI chat ("who's the biggest bust in this league?"), browse head-to-head records — everything works. When they're sold on the product (step 3), they sign up and connect their real league. The import wait is less frustrating because they already understand and want the product. This is the "try before you buy" approach. The trade-off is building and maintaining a realistic demo dataset.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Zero-friction first experience — no sign-up to see value</li>
+            <li>Users are already sold before they hit any friction</li>
+            <li>Great for App Store conversions — try instantly</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Demo data needs to be realistic and maintained</li>
+            <li>Users may play with demo but never connect their own league</li>
+            <li>AI chat costs money even on demo data</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Progressive Reveal</th>
+            <th class="col-b">B: Import First</th>
+            <th class="col-c">C: Invite Link</th>
+            <th class="col-d">D: Demo League</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Time to First Value</td>
+            <td class="col-recommended">~30 seconds (current season loads fast)</td>
+            <td>1-5 minutes (full import)</td>
+            <td>Instant for invited users</td>
+            <td>Instant (demo data)</td>
+          </tr>
+          <tr>
+            <td>Time to Personal Data</td>
+            <td class="col-recommended">~30 seconds (progressive)</td>
+            <td>1-5 minutes</td>
+            <td>Instant (league pre-imported)</td>
+            <td>1-5 minutes (after demo)</td>
+          </tr>
+          <tr>
+            <td>Drop-Off Risk</td>
+            <td class="col-recommended">Low — instant gratification</td>
+            <td>Medium — wait may lose users</td>
+            <td>Lowest for invited users</td>
+            <td>Medium — may not convert to real league</td>
+          </tr>
+          <tr>
+            <td>First Impression Quality</td>
+            <td class="col-recommended">Good — partial but growing</td>
+            <td>Best — full experience, nothing missing</td>
+            <td>Good — social context from the start</td>
+            <td>Good — but it's not their data</td>
+          </tr>
+          <tr>
+            <td>Works for Solo Discovery</td>
+            <td class="col-recommended">Yes</td>
+            <td>Yes</td>
+            <td>No — needs an invite</td>
+            <td>Yes — best for App Store browsers</td>
+          </tr>
+          <tr>
+            <td>Viral / Growth Potential</td>
+            <td class="col-recommended">Medium — user invites after setup</td>
+            <td>Medium — same</td>
+            <td>Highest — invite is the entry point</td>
+            <td>Low — solo experience</td>
+          </tr>
+          <tr>
+            <td>Build Complexity</td>
+            <td class="col-recommended">Medium — skeleton states, animations</td>
+            <td>Medium — import screen, push notification</td>
+            <td>High — invite system, preview pages, deep links</td>
+            <td>Medium — demo dataset, conversion funnel</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

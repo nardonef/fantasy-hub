@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 3: Database & Data Modeling — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; max-width: 1200px; }
+    .back-link:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .arch-diagram { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0.5rem; width: 100%; }
+    .arch-layer { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; width: 100%; }
+    .arch-box { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: center; min-width: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .arch-box.frontend { border-color: #7c3aed; color: #7c3aed; }
+    .arch-box.backend { border-color: #0891b2; color: #0891b2; }
+    .arch-box.database { border-color: #059669; color: #059669; }
+    .arch-box.service { border-color: #dc2626; color: #dc2626; }
+    .arch-box.infra { border-color: #64748b; color: #64748b; }
+    .arch-arrow { font-size: 1rem; color: #94a3b8; text-align: center; }
+    .arch-note { font-size: 0.6rem; color: #94a3b8; text-align: center; font-style: italic; margin-top: 4px; }
+
+    .schema-preview { width: 100%; max-width: 300px; font-size: 0.65rem; font-family: 'SF Mono', 'Fira Code', monospace; }
+    .schema-table { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+    .schema-table-name { font-weight: 700; color: #0f172a; margin-bottom: 6px; font-size: 0.7rem; }
+    .schema-field { color: #475569; padding: 1px 0; display: flex; justify-content: space-between; }
+    .schema-field .type { color: #7c3aed; }
+    .schema-field .key { color: #f59e0b; font-weight: 700; }
+    .schema-connector { text-align: center; color: #94a3b8; font-size: 0.8rem; margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 3 of 12</span>
+    <h1>Database & Data Modeling</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      This is arguably the most important technical decision for Fantasy League Hub. You're aggregating data from three different providers (Yahoo, ESPN, Sleeper) that each structure their data differently — different IDs, different season formats, different ways of representing matchups, rosters, and transactions. The database needs to normalize all of this into a unified model that supports fast analytics queries across years of history. The choice here affects query performance, how easy it is to add new providers later, and how the AI assistant retrieves league context.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: PostgreSQL + Prisma -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">PostgreSQL + Prisma ORM</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="schema-preview">
+          <div class="schema-table">
+            <div class="schema-table-name">leagues</div>
+            <div class="schema-field"><span>id</span> <span class="type">uuid <span class="key">PK</span></span></div>
+            <div class="schema-field"><span>provider</span> <span class="type">enum(yahoo,espn,sleeper)</span></div>
+            <div class="schema-field"><span>external_id</span> <span class="type">string</span></div>
+            <div class="schema-field"><span>name, season, settings</span> <span class="type">...</span></div>
+          </div>
+          <div class="schema-connector">↓ has many</div>
+          <div class="schema-table">
+            <div class="schema-table-name">matchups</div>
+            <div class="schema-field"><span>id</span> <span class="type">uuid <span class="key">PK</span></span></div>
+            <div class="schema-field"><span>league_id</span> <span class="type">uuid <span class="key">FK</span></span></div>
+            <div class="schema-field"><span>week, team_a, team_b</span> <span class="type">...</span></div>
+            <div class="schema-field"><span>score_a, score_b</span> <span class="type">decimal</span></div>
+          </div>
+          <div class="schema-connector">↓ has many</div>
+          <div class="schema-table">
+            <div class="schema-table-name">roster_entries</div>
+            <div class="schema-field"><span>matchup_id, player_id</span> <span class="type">uuid <span class="key">FK</span></span></div>
+            <div class="schema-field"><span>slot, points</span> <span class="type">string, decimal</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        PostgreSQL with Prisma ORM — the most popular combo in the Node.js ecosystem. Prisma gives you a type-safe query builder that auto-generates TypeScript types from your schema, so your Express API gets compile-time safety on every database query. PostgreSQL is rock-solid for relational data and excels at the complex joins you'll need (e.g., "give me all matchups between Manager A and Manager B across all seasons and providers"). You'd use pgvector (a Postgres extension) for the AI feature — storing embeddings of league events so the chat assistant can do semantic search. I recommend this because the relational model is the natural fit for league data, Prisma keeps your queries type-safe, and pgvector means you don't need a separate vector database for AI.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Type-safe queries — Prisma catches errors at compile time</li>
+            <li>Complex joins are fast (head-to-head, cross-season analytics)</li>
+            <li>pgvector for AI embeddings — no separate vector DB needed</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Schema migrations can be tricky as the model evolves</li>
+            <li>Prisma adds a query engine layer — slight overhead vs raw SQL</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: PostgreSQL + Drizzle -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">PostgreSQL + Drizzle ORM</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="schema-preview">
+          <div class="schema-table">
+            <div class="schema-table-name">leagues (schema-as-code)</div>
+            <div class="schema-field"><span>export const leagues =</span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;pgTable('leagues', {</span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;&nbsp;&nbsp;id: uuid().primaryKey(),</span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;&nbsp;&nbsp;provider: providerEnum(),</span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;&nbsp;&nbsp;externalId: text(),</span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;})</span></div>
+          </div>
+          <div class="schema-connector">↓ SQL-like queries in TypeScript</div>
+          <div class="schema-table">
+            <div class="schema-table-name">Query Example</div>
+            <div class="schema-field"><span>db.select()</span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;.from(matchups)</span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;.where(eq(matchups.leagueId, id))</span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;.innerJoin(leagues, ...)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Same PostgreSQL database, but with Drizzle ORM instead of Prisma. Drizzle is newer and takes a different philosophy: your schema is defined in TypeScript code (not a separate schema file), and queries look almost like SQL — so if you know SQL, you already know Drizzle. It's thinner than Prisma (no query engine binary), generates SQL you can read and predict, and runs faster for complex queries. The trade-off is a smaller ecosystem and slightly more manual setup for things Prisma auto-generates (like relations). Still gets pgvector for AI embeddings.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Thinner abstraction — queries map directly to SQL</li>
+            <li>Better performance for complex analytics queries</li>
+            <li>Schema-as-TypeScript-code feels natural</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Newer — smaller ecosystem and community</li>
+            <li>Relations require more manual setup than Prisma</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: PostgreSQL + MongoDB Hybrid -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Postgres + Mongo Hybrid</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box backend">Express API</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box database">PostgreSQL</div>
+            <div class="arch-box service">MongoDB</div>
+          </div>
+          <div class="arch-arrow" style="display:flex;gap:40px;justify-content:center">
+            <span>↓</span><span>↓</span>
+          </div>
+          <div class="arch-layer">
+            <div class="arch-box infra" style="font-size:0.6rem">Structured data<br>(users, leagues, matchups)</div>
+            <div class="arch-box infra" style="font-size:0.6rem">Raw provider data<br>(JSON snapshots, events)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Use both: PostgreSQL for your normalized, structured data (users, leagues, matchups, standings) and MongoDB for the raw, messy stuff — provider API response snapshots, transaction logs, draft event streams, and chat history. The idea is that Yahoo, ESPN, and Sleeper all return different JSON shapes, so you store the raw responses in MongoDB as-is (easy to debug, reprocess, or re-sync) while the normalized, query-friendly version lives in Postgres. It's a solid pattern when you're ingesting data from external APIs with unpredictable schemas.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Raw provider data is messy and varies — MongoDB handles it naturally</li>
+            <li>Easy to reprocess raw data if your normalized model changes</li>
+            <li>Each database does what it's best at</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Two databases to manage, backup, and keep consistent</li>
+            <li>Queries that span both stores are complex</li>
+            <li>More infrastructure cost and operational overhead</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: PostgreSQL + JSONB Columns -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">PostgreSQL + JSONB Flex Columns</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="schema-preview">
+          <div class="schema-table">
+            <div class="schema-table-name">matchups (relational + flexible)</div>
+            <div class="schema-field"><span>id</span> <span class="type">uuid <span class="key">PK</span></span></div>
+            <div class="schema-field"><span>league_id</span> <span class="type">uuid <span class="key">FK</span></span></div>
+            <div class="schema-field"><span>week, team_a, team_b</span> <span class="type">standard cols</span></div>
+            <div class="schema-field"><span>score_a, score_b</span> <span class="type">decimal</span></div>
+            <div class="schema-field" style="color:#7c3aed;font-weight:600"><span>provider_data</span> <span class="type" style="color:#7c3aed">jsonb</span></div>
+            <div class="schema-field" style="color:#7c3aed;font-weight:600"><span>computed_stats</span> <span class="type" style="color:#7c3aed">jsonb</span></div>
+          </div>
+          <div class="schema-connector">↓ JSONB is indexed & queryable</div>
+          <div class="schema-table">
+            <div class="schema-table-name">Query provider-specific fields</div>
+            <div class="schema-field"><span>WHERE provider_data->></span></div>
+            <div class="schema-field"><span>&nbsp;&nbsp;'projection' > '100'</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        One PostgreSQL database, but use JSONB columns alongside traditional relational columns for the parts that vary between providers. Core fields (scores, weeks, team IDs) are normal columns you can index and join on. Provider-specific extras (Yahoo's projected points format, ESPN's specific stat categories, Sleeper's player metadata) go into a JSONB column — fully indexed, fully queryable, but flexible enough to store different shapes without schema changes. This gives you the Option C benefit (handling messy provider data) without the Option C cost (two databases). It's the pragmatic middle ground.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>One database — simpler ops, backups, and consistency</li>
+            <li>JSONB handles provider-specific data without schema changes</li>
+            <li>Still fully queryable and indexable via GIN indexes</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>JSONB queries are slower than native columns for heavy analytics</li>
+            <li>No compile-time type safety on JSONB fields</li>
+            <li>Can become a junk drawer if not disciplined</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Postgres + Prisma</th>
+            <th class="col-b">B: Postgres + Drizzle</th>
+            <th class="col-c">C: Postgres + Mongo</th>
+            <th class="col-d">D: Postgres + JSONB</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Type Safety</td>
+            <td class="col-recommended">Excellent — auto-generated types</td>
+            <td>Excellent — schema-as-code</td>
+            <td>Mixed — Postgres typed, Mongo flexible</td>
+            <td>Partial — relational typed, JSONB untyped</td>
+          </tr>
+          <tr>
+            <td>Complex Analytics Queries</td>
+            <td class="col-recommended">Good — Prisma handles most, raw SQL for rest</td>
+            <td>Great — SQL-like syntax, fine-grained control</td>
+            <td>Good for Postgres data, poor across both stores</td>
+            <td>Good — but JSONB queries slower than native cols</td>
+          </tr>
+          <tr>
+            <td>Handling Provider Data Differences</td>
+            <td class="col-recommended">Normalize everything upfront</td>
+            <td>Normalize everything upfront</td>
+            <td>Best — raw + normalized separation</td>
+            <td>Good — JSONB flex columns for extras</td>
+          </tr>
+          <tr>
+            <td>AI/Vector Search (pgvector)</td>
+            <td class="col-recommended">Built-in via Prisma extension</td>
+            <td>Built-in via Drizzle pgvector</td>
+            <td>Postgres side only</td>
+            <td>Built-in</td>
+          </tr>
+          <tr>
+            <td>Operational Complexity</td>
+            <td class="col-recommended">Low — one database</td>
+            <td>Low — one database</td>
+            <td>High — two databases to manage</td>
+            <td>Low — one database</td>
+          </tr>
+          <tr>
+            <td>Migration Story</td>
+            <td class="col-recommended">Great — Prisma Migrate is mature</td>
+            <td>Good — Drizzle Kit handles migrations</td>
+            <td>Complex — two migration systems</td>
+            <td>Good — standard Postgres migrations</td>
+          </tr>
+          <tr>
+            <td>Query Performance</td>
+            <td class="col-recommended">Good — Prisma engine adds slight overhead</td>
+            <td>Best — thinnest abstraction, predictable SQL</td>
+            <td>Good for each store individually</td>
+            <td>Good — JSONB indexed but not as fast as columns</td>
+          </tr>
+          <tr>
+            <td>Ecosystem & Community</td>
+            <td class="col-recommended">Largest — most tutorials, plugins, answers</td>
+            <td>Growing fast — active community</td>
+            <td>Both are well-established individually</td>
+            <td>Standard Postgres — well-documented pattern</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

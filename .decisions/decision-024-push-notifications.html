@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 24: Push Notification Infrastructure — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.25rem; background: #f8fafc; display: flex; align-items: flex-start; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .arch-diagram { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0.5rem; width: 100%; }
+    .arch-layer { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; width: 100%; }
+    .arch-box { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 7px 13px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .arch-box.ios { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
+    .arch-box.api { border-color: #0891b2; color: #0891b2; background: #ecfeff; }
+    .arch-box.service { border-color: #059669; color: #059669; background: #ecfdf5; }
+    .arch-box.apns { border-color: #f59e0b; color: #92400e; background: #fffbeb; }
+    .arch-arrow { font-size: 0.9rem; color: #94a3b8; text-align: center; }
+    .notif-preview { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 260px; }
+    .notif-card { background: white; border-radius: 10px; padding: 10px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+    .notif-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .notif-icon { width: 20px; height: 20px; border-radius: 5px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+    .notif-app { font-size: 0.6rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
+    .notif-title { font-size: 0.75rem; font-weight: 700; color: #0f172a; }
+    .notif-body { font-size: 0.68rem; color: #475569; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 24 of 25</span>
+    <h1>Push Notification Infrastructure</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      Push notifications span the full stack: iOS needs to register for notifications and handle deep links from taps, the Express API needs to store device tokens and dispatch notifications, and something needs to connect your server to Apple's Push Notification service (APNs). The choice is between building directly on APNs (full control, no third party), using Firebase Cloud Messaging as a middle layer, or a managed service that handles the delivery complexity. Since social is low priority, this only needs to cover AI-related events: weekly recap ready, and optionally new AI insights.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option B but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- Option A: Direct APNs via node-apn -->
+    <article class="option-card option-a">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Direct APNs (node-apn)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box ios">iOS App</div>
+          </div>
+          <div class="arch-arrow">↓ register → device token</div>
+          <div class="arch-layer">
+            <div class="arch-box api">Express API</div>
+          </div>
+          <div class="arch-arrow">↓ store token in DB</div>
+          <div class="arch-layer">
+            <div class="arch-box api">BullMQ notification job</div>
+          </div>
+          <div class="arch-arrow">↓ send via node-apn</div>
+          <div class="arch-layer">
+            <div class="arch-box apns">Apple APNs</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer">
+            <div class="arch-box ios">iPhone lock screen</div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use the <code>node-apn</code> (or <code>apn</code>) npm package to send directly to Apple's Push Notification service from your Express API. You store device tokens in a new <code>device_tokens</code> Prisma table, and a BullMQ job dispatches notifications when events fire. No third-party dependency in the delivery path — just your server talking to Apple. Requires an APNs key (.p8 file) from your Apple Developer account, which takes about 5 minutes to generate.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>No third-party dependency — just your server and Apple</li>
+            <li>iOS-only app, no Android to worry about</li>
+            <li>Full control over retry logic and delivery tracking</li>
+            <li>No ongoing cost beyond your server</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Must manage APNs certificate/key rotation yourself</li>
+            <li>No delivery analytics out of the box</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Firebase Cloud Messaging -->
+    <article class="option-card option-b">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Firebase Cloud Messaging (FCM)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box ios">iOS App</div>
+          </div>
+          <div class="arch-arrow">↓ FCM token</div>
+          <div class="arch-layer">
+            <div class="arch-box api">Express API</div>
+          </div>
+          <div class="arch-arrow">↓ firebase-admin SDK</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Firebase FCM</div>
+          </div>
+          <div class="arch-arrow">↓ routes to APNs</div>
+          <div class="arch-layer">
+            <div class="arch-box apns">Apple APNs</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer">
+            <div class="arch-box ios">iPhone lock screen</div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use Firebase Cloud Messaging as a middle layer — your Express API sends to FCM via <code>firebase-admin</code>, and FCM handles the APNs delivery. The benefit: FCM adds delivery receipts, handles token refresh automatically, and is Android-ready if you ever expand. The cost: a Google/Firebase project dependency for an iOS-only app, and an extra hop in the delivery chain. FCM's free tier is generous and more than enough for a personal app.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Delivery receipts and analytics matter</li>
+            <li>Future Android expansion is possible</li>
+            <li>Auto token refresh reduces maintenance</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Google dependency for an iOS-only app adds unnecessary complexity</li>
+            <li>Extra delivery hop adds latency</li>
+            <li>Firebase project setup + config files in iOS app</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Managed service (OneSignal) -->
+    <article class="option-card option-c">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Managed Service (OneSignal)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box ios">iOS App + OneSignal SDK</div>
+          </div>
+          <div class="arch-arrow">↓ player_id (token)</div>
+          <div class="arch-layer">
+            <div class="arch-box api">Express API</div>
+          </div>
+          <div class="arch-arrow">↓ OneSignal REST API</div>
+          <div class="arch-layer">
+            <div class="arch-box service">OneSignal</div>
+          </div>
+          <div class="arch-arrow">↓ APNs delivery</div>
+          <div class="arch-layer">
+            <div class="arch-box ios">iPhone lock screen</div>
+          </div>
+          <div style="margin-top:6px;font-size:0.62rem;color:#94a3b8;text-align:center;">Free tier: unlimited notifications</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        OneSignal is a managed push notification service — you add their SDK to the iOS app, make REST API calls from Express, and they handle all APNs complexity. Comes with a dashboard, delivery analytics, segmentation, and A/B testing you'll never use. Free tier covers everything you need. The downside: an SDK in your iOS app and a third-party in the critical delivery path. Overkill for a personal app sending weekly recaps.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Fastest to implement — dashboard handles APNs config</li>
+            <li>Rich delivery analytics and segmentation built in</li>
+            <li>Free tier is extremely generous</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Third-party SDK in iOS app for a simple use case</li>
+            <li>Overkill — you don't need segmentation or A/B for this app</li>
+            <li>Vendor dependency for a core user-facing feature</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Defer push notifications entirely -->
+    <article class="option-card option-d">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Defer — In-App Notifications Only</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="notif-preview">
+          <div style="font-size:0.62rem;color:#94a3b8;text-align:center;margin-bottom:4px;">Instead of push, show on next app open:</div>
+          <div class="notif-card">
+            <div class="notif-header">
+              <div class="notif-icon">🏆</div>
+              <span class="notif-app">Fantasy Hub — New</span>
+            </div>
+            <div class="notif-title">Your Week 7 recap is ready</div>
+            <div class="notif-body">You went 1-1 this week. Frank's team scored a league-high 142pts…</div>
+          </div>
+          <div style="font-size:0.62rem;color:#94a3b8;text-align:center;margin-top:4px;">Shown as a banner/badge on Chat tab — no APNs needed</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Don't implement push notifications for V2 at all. When a weekly recap is ready, surface it as an in-app notification badge on the Chat tab — users see it the next time they open the app. This is zero infrastructure work: no APNs certificates, no device token table, no BullMQ notification job, no iOS permission prompt. Push notifications can be added in V3 once the recap content is validated and users actually want the interruption.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Social is low priority (already decided) — push fits social, not AI chat</li>
+            <li>Zero infrastructure overhead — ship AI chat faster</li>
+            <li>Validate recap content before interrupting users' phones</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Users must open the app to see recaps — no re-engagement loop</li>
+            <li>Push infra needs to be built eventually anyway</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Direct APNs</th>
+            <th class="col-b">B: Firebase FCM</th>
+            <th class="col-c">C: OneSignal</th>
+            <th class="col-d">D: Defer (In-App Only)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>External dependencies</td>
+            <td class="col-recommended">None (just Apple)</td>
+            <td>Google Firebase</td>
+            <td>OneSignal SDK + service</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>iOS SDK required</td>
+            <td class="col-recommended">No (native UNUserNotifications)</td>
+            <td>Yes (Firebase iOS SDK)</td>
+            <td>Yes (OneSignal iOS SDK)</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Prisma schema changes</td>
+            <td class="col-recommended">device_tokens table</td>
+            <td>device_tokens table</td>
+            <td>player_ids table</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Notification events</td>
+            <td class="col-recommended">Weekly recap, AI insight</td>
+            <td>Weekly recap, AI insight</td>
+            <td>Weekly recap, AI insight</td>
+            <td>In-app badge only</td>
+          </tr>
+          <tr>
+            <td>Implementation effort</td>
+            <td class="col-recommended">Medium</td>
+            <td>Medium-High</td>
+            <td>Low (managed)</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Ongoing cost</td>
+            <td class="col-recommended">Free</td>
+            <td>Free (generous tier)</td>
+            <td>Free (generous tier)</td>
+            <td>Free</td>
+          </tr>
+          <tr>
+            <td>Aligns with "social is low priority"</td>
+            <td class="col-recommended">Partial — still needs infra</td>
+            <td>Partial</td>
+            <td>Partial</td>
+            <td>Yes — defer entirely</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option D"</strong>, or <strong>"Option A but [your change]"</strong></p>
+    <p>To change a past decision: <strong>"for decision-024 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

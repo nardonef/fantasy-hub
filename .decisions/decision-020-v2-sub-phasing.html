@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 20: V2 Sub-Phasing & Build Order — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .phase-diagram { display: flex; flex-direction: column; gap: 6px; padding: 0.75rem; width: 100%; max-width: 280px; }
+    .phase-block { border-radius: 8px; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; }
+    .phase-block .phase-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; font-weight: 700; color: white; }
+    .phase-block .phase-title { font-size: 0.8rem; font-weight: 700; color: white; }
+    .phase-block .phase-items { font-size: 0.65rem; opacity: 0.9; font-weight: 400; line-height: 1.4; color: white; }
+    .phase-block.infra { background: #64748b; }
+    .phase-block.ai { background: #7c3aed; }
+    .phase-block.social { background: #059669; }
+    .phase-block.full { background: #6366f1; }
+    .phase-arrow { font-size: 0.9rem; color: #94a3b8; text-align: center; }
+    .phase-gate { font-size: 0.6rem; color: #64748b; background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 3px 8px; text-align: center; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 20 of 25</span>
+    <h1>V2 Sub-Phasing & Build Order</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      V2 has two major workstreams: AI Chat (the marquee feature) and Social (recaps, push notifications, profile sharing, manager identity merging). Some pieces have hard dependencies — pgvector and the embedding pipeline must exist before the AI chat can work — but social features are mostly independent. This decision defines whether to build them sequentially with intermediate ship points, or together as one release.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option B but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- Option A -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">AI First, Social Second</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="phase-diagram">
+          <div class="phase-block infra">
+            <span class="phase-label">Phase 2a — Foundation</span>
+            <span class="phase-title">Infrastructure</span>
+            <span class="phase-items">pgvector · LLM SDK · embedding pipeline</span>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-block ai">
+            <span class="phase-label">Phase 2b — Core</span>
+            <span class="phase-title">AI Chat</span>
+            <span class="phase-items">RAG · tool definitions · iOS chat UI · contextual triggers</span>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-gate">Ship 2b — App with AI chat</div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-block social">
+            <span class="phase-label">Phase 2c — Social</span>
+            <span class="phase-title">Recaps + Social</span>
+            <span class="phase-items">weekly recaps · push notifications · profile sharing · manager merging</span>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-gate">Ship V2 Complete</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Build the AI infrastructure and chat experience first — it's the defining V2 feature and has the most architectural unknowns. Social features follow once the AI is working. The 2b milestone gives you something meaningfully different to use before all of V2 is done. Weekly recaps can reuse the LLM infrastructure you built for chat, so social phase benefits from AI work being done first.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>AI chat is the primary reason to build V2</li>
+            <li>Weekly recaps reuse the LLM already set up for chat</li>
+            <li>You want an intermediate shippable milestone</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>LLM provider and cost decisions must be made up front</li>
+            <li>Social features deferred — push notifications ship later</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Social First, AI Second</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="phase-diagram">
+          <div class="phase-block social">
+            <span class="phase-label">Phase 2a</span>
+            <span class="phase-title">Social + Recaps</span>
+            <span class="phase-items">push notifications · profile sharing · manager merging · weekly recaps</span>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-gate">Ship 2a — V1 + Social layer</div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-block infra">
+            <span class="phase-label">Phase 2b</span>
+            <span class="phase-title">AI Infrastructure</span>
+            <span class="phase-items">pgvector · LLM SDK · embedding pipeline</span>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-block ai">
+            <span class="phase-label">Phase 2c</span>
+            <span class="phase-title">AI Chat</span>
+            <span class="phase-items">RAG · tool definitions · iOS chat UI · contextual triggers</span>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-gate">Ship V2 Complete</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Knock out the social layer first — push notifications, profile sharing, and manager merging have no LLM dependency and are mostly straightforward to build. Weekly recaps need an LLM, but a simpler template-based approach can ship without the full RAG infrastructure. Defers the hardest architectural work (pgvector, RAG pipeline) until the social layer is validated.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Push notifications and recaps feel more valuable than open-ended chat</li>
+            <li>You want to delay LLM cost/provider decisions</li>
+            <li>Social features are lower-risk and faster to ship</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>AI chat — the V2 marquee feature — ships last</li>
+            <li>Weekly recaps still need some LLM work, so you can't fully defer</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Ship Together</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="phase-diagram">
+          <div class="phase-block full">
+            <span class="phase-label">Phase 2 — Everything</span>
+            <span class="phase-title">All V2 Features</span>
+            <span class="phase-items">pgvector · AI chat · weekly recaps · push · profile sharing · manager merging</span>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-gate">Ship V2 Complete (all at once)</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Build all V2 features in dependency order without formal sub-phases, and ship everything together as a complete V2 release. No intermediate milestones — you naturally build infra before AI, and social features whenever. Works if you want V2 to feel like a complete, polished release rather than a trickle of partial updates, and there's no pressure to ship anything early.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>V2 should feel like a cohesive, complete release</li>
+            <li>No external pressure to ship partial features</li>
+            <li>Simplest planning — one milestone, no phase gates</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Long stretch with no usable new features</li>
+            <li>One blocker (LLM cost, push infra) can stall everything</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Parallel Tracks, Merge at End</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="phase-diagram">
+          <div class="phase-block infra">
+            <span class="phase-label">Phase 2a (shared)</span>
+            <span class="phase-title">Infrastructure</span>
+            <span class="phase-items">pgvector · LLM SDK · embedding pipeline · push token setup</span>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div style="display:flex;gap:6px;width:100%;">
+            <div style="flex:1;background:#7c3aed;border-radius:8px;padding:8px;font-size:0.65rem;color:white;font-weight:600;">Track 1<br/>AI Chat<br/><span style="font-weight:400;opacity:0.85;">RAG · tools · iOS</span></div>
+            <div style="flex:1;background:#059669;border-radius:8px;padding:8px;font-size:0.65rem;color:white;font-weight:600;">Track 2<br/>Social<br/><span style="font-weight:400;opacity:0.85;">recaps · push · sharing</span></div>
+          </div>
+          <div class="phase-arrow">↓</div>
+          <div class="phase-gate">Both tracks complete → Ship V2</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        After a shared infrastructure phase, AI Chat and Social run as independent parallel tracks. This is realistic if you context-switch between them (e.g., do all AI backend work, then all social iOS work), or if you think the work naturally separates cleanly. In practice, one track will finish before the other — the question is just whether you formalize that as a ship point or wait.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>The two tracks genuinely don't block each other</li>
+            <li>You want to context-switch rather than stay in one area</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>In practice, just sequential with extra naming overhead</li>
+            <li>Weekly recaps need the LLM, so tracks aren't fully independent</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">Option A: AI First</th>
+            <th class="col-b">Option B: Social First</th>
+            <th class="col-c">Option C: Ship Together</th>
+            <th class="col-d">Option D: Parallel Tracks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>First shippable milestone</td>
+            <td class="col-recommended">AI chat live</td>
+            <td>V1 + push + recaps</td>
+            <td>Full V2 at once</td>
+            <td>Whichever track finishes first</td>
+          </tr>
+          <tr>
+            <td>AI chat ships</td>
+            <td class="col-recommended">2nd phase</td>
+            <td>3rd phase (last)</td>
+            <td>All at once</td>
+            <td>When AI track finishes</td>
+          </tr>
+          <tr>
+            <td>LLM decisions needed</td>
+            <td class="col-recommended">Immediately (Decision 021)</td>
+            <td>Deferred (recaps may need it)</td>
+            <td>Whenever you get there</td>
+            <td>Before AI track starts</td>
+          </tr>
+          <tr>
+            <td>Weekly recaps LLM dependency</td>
+            <td class="col-recommended">Reuses AI infra already built</td>
+            <td>Needs simplified LLM path in 2a</td>
+            <td>Built alongside AI</td>
+            <td>Belongs in AI track, not social</td>
+          </tr>
+          <tr>
+            <td>Intermediate app utility</td>
+            <td class="col-recommended">High — AI chat usable mid-V2</td>
+            <td>High — push + recaps usable mid-V2</td>
+            <td>None until V2 complete</td>
+            <td>Partial, depends on track pace</td>
+          </tr>
+          <tr>
+            <td>Risk profile</td>
+            <td class="col-recommended">Low — biggest unknowns resolved first</td>
+            <td>Low — easiest work first, AI deferred</td>
+            <td>Medium — no checkpoint to catch issues</td>
+            <td>Medium — parallel adds coordination overhead</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option B but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-020 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

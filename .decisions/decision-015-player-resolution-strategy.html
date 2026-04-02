@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 15: Player Resolution Strategy — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "\2713 "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .flow-container { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem; width: 100%; max-width: 280px; }
+    .flow-step { display: flex; align-items: center; gap: 10px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .flow-step.highlight { border-color: #6366f1; background: #eff6ff; color: #1d4ed8; }
+    .flow-step-number { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; flex-shrink: 0; }
+    .flow-step.highlight .flow-step-number { background: #6366f1; color: white; }
+    .flow-step-label { flex: 1; }
+    .flow-down-arrow { font-size: 1rem; color: #94a3b8; padding: 2px 0; text-align: center; }
+    .flow-step.error { border-color: #e11d48; background: #fff1f2; color: #be123c; }
+    .flow-step.error .flow-step-number { background: #e11d48; color: white; }
+    .flow-branch-label { font-size: 0.6rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; text-align: center; padding: 6px 0 2px; border-top: 1px dashed #cbd5e1; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">&larr; All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 15 of 19</span>
+    <h1>Player Resolution Strategy</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      Every ingestion job writes a raw player name string -- "Patrick Mahomes", "P. Mahomes", "Mahomes II", "Pat Mahomes" could all refer to the same person. You need a way to resolve these raw names to canonical Player records in your new Player table. Your build plan says "Levenshtein or similar" with ambiguous matches staying unresolved until LLM disambiguation in Phase 5. This decision is about the specifics: where does the canonical roster come from, how does fuzzy matching work, and how do you handle the ~5-10% of names that are genuinely ambiguous?
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> &middot; <strong>"Option A but [change]"</strong> &middot; <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Simple Levenshtein -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Alias Table + Exact-First</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Ingest raw name from source</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Exact match against PlayerNameAlias table</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-branch-label">if no exact match &darr;</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">Levenshtein against Player.fullName (threshold &le; 2)</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-branch-label">if single match &darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">4a</span>
+            <span class="flow-step-label">Auto-resolve + save alias for next time</span>
+          </div>
+          <div class="flow-branch-label">if ambiguous or no match &darr;</div>
+          <div class="flow-step error">
+            <span class="flow-step-number">4b</span>
+            <span class="flow-step-label">Leave unresolved (playerId = null)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        The simplest approach that works. In step 2, check the PlayerNameAlias table first -- this is a lookup table of known name variants ("P. Mahomes" &rarr; Patrick Mahomes). If no alias matches, step 3 runs Levenshtein distance against all Player.fullName values with a strict threshold (&le; 2 edits). If exactly one player matches, auto-resolve and save the new alias so it's instant next time (step 4a). If multiple players match or none do, leave it unresolved (step 4b) for Phase 5 LLM disambiguation. The alias table is the key insight -- it's a self-building cache that makes the system faster over time. I recommend this because it's simple, deterministic, and the alias table handles 90%+ of cases after the first few runs.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Most names are close to canonical ("P. Mahomes" &rarr; "Patrick Mahomes")</li>
+            <li>The alias table self-builds -- resolution improves automatically over time</li>
+            <li>No external dependencies, just string comparison in PostgreSQL or JS</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Levenshtein is O(n*m) per comparison -- fine for ~2000 NFL players but be aware</li>
+            <li>Nicknames like "Hollywood Brown" won't match "Marquise Brown" (distance too high)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Trigram + pg_trgm -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">PostgreSQL Trigram</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Ingest raw name from source</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Check alias table (exact match)</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">pg_trgm similarity search (threshold &ge; 0.4)</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Rank by similarity score, take top if &ge; 0.6</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Auto-resolve or leave unresolved</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Use PostgreSQL's built-in <code>pg_trgm</code> extension (already available since you're on PostgreSQL 17) for fuzzy matching instead of Levenshtein. Trigram similarity breaks names into 3-character chunks and compares overlap -- it handles typos, abbreviations, and reorderings better than pure edit distance. In step 3, run <code>SELECT * FROM player WHERE similarity(full_name, 'P. Mahomes') > 0.4 ORDER BY similarity DESC</code>. If the top result scores above 0.6, auto-resolve. The big advantage: pg_trgm supports GIN indexes, so fuzzy searches are fast even at scale.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>GIN index makes fuzzy search fast -- no scanning every player row</li>
+            <li>Handles abbreviations and typos better than Levenshtein</li>
+            <li>Built into PostgreSQL, no external library needed</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Requires raw SQL -- Prisma doesn't support pg_trgm natively</li>
+            <li>Still can't resolve nicknames or slang ("Hollywood" &rarr; "Marquise Brown")</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: SportsDataIO Roster as Source -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Roster-Seeded Lookup</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step highlight">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Weekly: pull full NFL roster from SportsDataIO</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">Upsert Player table with canonical names + IDs</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">On ingest: exact match alias table</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Fallback: Levenshtein against Player.fullName</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Auto-resolve or leave unresolved</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Same resolution logic as Option A, but the key difference is where the canonical Player roster comes from. Instead of manually seeding players, use SportsDataIO's roster endpoint (which you already have via the free tier from Decision 14) to automatically populate and update the Player table weekly. This means the Player table always has current NFL rosters with official names, teams, positions, and external IDs. Steps 3-5 are the same alias + Levenshtein flow -- but now you have a reliable, auto-updating roster to match against.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Player table stays current automatically -- new signings, trades, rookies</li>
+            <li>SportsDataIO provides external IDs that link across platforms</li>
+            <li>Reuses a data source you're already paying for (free tier)</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Uses some of your 1,000 monthly SportsDataIO API calls for roster syncs</li>
+            <li>Still need the same fuzzy matching logic on top -- roster source doesn't change that</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Pre-built Name Mapping Dictionary -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Curated Dictionary</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step highlight">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">Maintain JSON dict: nicknames &rarr; canonical names</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">On ingest: check dictionary first</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">Fallback: exact + fuzzy match on Player table</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Log unresolved names for manual review</span>
+          </div>
+          <div class="flow-down-arrow">&darr;</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Periodically add new mappings to dictionary</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Start with a hand-curated JSON dictionary of known name variants and nicknames. "Hollywood" &rarr; "Marquise Brown", "CMC" &rarr; "Christian McCaffrey", "Lamar" &rarr; "Lamar Jackson" (when context is NFL). This handles the cases that no fuzzy matching algorithm can -- slang, nicknames, abbreviations that are culturally specific. The dictionary is checked first, then normal fuzzy matching runs as fallback. Unresolved names get logged for periodic manual review, and you grow the dictionary over time.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Handles nicknames and slang that algorithms can't (CMC, Hollywood, etc.)</li>
+            <li>Deterministic -- same input always gives same output</li>
+            <li>Dictionary becomes a valuable asset, especially for Reddit/social content</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Requires manual curation effort -- someone has to maintain the dictionary</li>
+            <li>New players or trending nicknames won't resolve until added</li>
+            <li>Ambiguous single names ("Lamar") could match wrong sport/context</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Alias + Exact-First</th>
+            <th class="col-b">B: PostgreSQL Trigram</th>
+            <th class="col-c">C: Roster-Seeded</th>
+            <th class="col-d">D: Curated Dict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Roster source</td>
+            <td class="col-recommended">Manual seed or import</td>
+            <td>Manual seed or import</td>
+            <td>SportsDataIO auto-sync</td>
+            <td>Manual seed + dictionary</td>
+          </tr>
+          <tr>
+            <td>Fuzzy matching</td>
+            <td class="col-recommended">Levenshtein (JS/SQL)</td>
+            <td>pg_trgm (PostgreSQL)</td>
+            <td>Levenshtein (JS/SQL)</td>
+            <td>Dictionary-first, then fuzzy</td>
+          </tr>
+          <tr>
+            <td>Handles nicknames</td>
+            <td class="col-recommended">No -- alias table only learns from resolved matches</td>
+            <td>Somewhat -- trigrams handle abbreviations</td>
+            <td>No -- same as A</td>
+            <td>Yes -- hand-curated mappings</td>
+          </tr>
+          <tr>
+            <td>Self-improving</td>
+            <td class="col-recommended">Yes -- alias table grows automatically</td>
+            <td>No -- static similarity scoring</td>
+            <td>Yes -- alias table + auto-updated roster</td>
+            <td>Manual -- requires human review</td>
+          </tr>
+          <tr>
+            <td>External dependencies</td>
+            <td class="col-recommended">None</td>
+            <td>pg_trgm extension (built-in)</td>
+            <td>SportsDataIO API calls</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Prisma compatibility</td>
+            <td class="col-recommended">Full -- pure Prisma queries</td>
+            <td>Partial -- raw SQL for similarity()</td>
+            <td>Full -- pure Prisma queries</td>
+            <td>Full -- JSON + Prisma queries</td>
+          </tr>
+          <tr>
+            <td>Expected resolution rate</td>
+            <td class="col-recommended">~85-90% after warm-up</td>
+            <td>~88-92%</td>
+            <td>~85-90% with better roster coverage</td>
+            <td>~93-97% with good dictionary</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-014 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

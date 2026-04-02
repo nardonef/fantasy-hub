@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 10: Analytics Dashboard UX — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.interaction { background: #e0f2fe; color: #0369a1; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; max-width: 1200px; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .sitemap { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0.5rem; }
+    .sitemap-level { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .sitemap-node { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; font-size: 0.7rem; font-weight: 600; color: #334155; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .sitemap-node.primary { background: #1a1a1a; color: #c9a96e; border-color: #c9a96e; }
+    .sitemap-node.active { background: #c9a96e; color: #1a1a1a; border-color: #c9a96e; }
+    .sitemap-node.secondary { background: #f8fafc; border-color: #cbd5e1; color: #64748b; font-size: 0.6rem; }
+    .sitemap-connector { width: 2px; height: 12px; background: #cbd5e1; margin: 0 auto; }
+
+    .flow-container { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem; width: 100%; max-width: 280px; }
+    .flow-step { display: flex; align-items: center; gap: 10px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .flow-step.highlight { border-color: #6366f1; background: #eff6ff; color: #1d4ed8; }
+    .flow-step-number { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; flex-shrink: 0; }
+    .flow-step.highlight .flow-step-number { background: #6366f1; color: white; }
+    .flow-step-label { flex: 1; }
+    .flow-down-arrow { font-size: 1rem; color: #94a3b8; padding: 2px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 10 of 12</span>
+    <h1>Analytics Dashboard UX</h1>
+    <span class="category-badge interaction">Interaction</span>
+    <p class="decision-description">
+      The Analytics tab is the heart of Fantasy League Hub — it's where users explore the insights no single platform provides. The question is how to organize a deep analytics surface on a phone screen. You've got head-to-head records, luck indexes, scoring trends, consistency ratings, draft grades, power rankings, playoff performance, and champion histories — potentially dozens of views. How do users navigate all of this without it feeling like a spreadsheet? And how do you make the data feel alive and storytelling-driven rather than just rows of numbers?
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Category Sections -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Scrollable Category Sections</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="sitemap">
+          <div class="sitemap-level">
+            <div class="sitemap-node active">Analytics Tab</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node secondary">Season filter: 2025 / All-Time / Custom</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node primary">Standings & Rankings</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node primary">Head-to-Head</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node primary">Scoring & Trends</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node primary">Draft Analysis</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node primary">Records & Milestones</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        One long vertical scroll divided into clearly labeled sections: Standings & Rankings, Head-to-Head, Scoring & Trends, Draft Analysis, Records & Milestones. Each section shows a compact preview (top 3 in a ranking, a mini chart, a headline stat) with a "See All" link that pushes to a full detail view. A sticky season filter at the top lets you toggle between current season, all-time, or a custom range — and every section updates. This is the Apple Health / Fitness model: scroll to browse, tap to dive deep. I recommend this because it's the most discoverable — users see everything available just by scrolling, and the season filter gives them control over the time dimension without navigating away.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Most discoverable — scroll to see every analytics category</li>
+            <li>Season filter controls time dimension globally</li>
+            <li>Compact previews + "See All" keeps the scroll manageable</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Long scroll with many sections can feel overwhelming</li>
+            <li>Users who want one specific stat have to scroll to find it</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Manager-Centric -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Manager-Centric Profiles</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="sitemap">
+          <div class="sitemap-level">
+            <div class="sitemap-node active">Analytics Tab</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node primary">Manager Grid (all 12 avatars)</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node secondary">Tap a manager →</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node primary">Career Stats</div>
+            <div class="sitemap-node primary">H2H vs Everyone</div>
+            <div class="sitemap-node primary">Draft History</div>
+            <div class="sitemap-node primary">Trends</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node secondary">Compare button → pick 2nd manager</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Organize analytics around people, not categories. The Analytics tab opens to a grid of all league managers (avatars/initials). Tap any manager to see their full profile: career record, scoring trends, draft history, luck index, playoff performance, and head-to-head records against everyone. A "Compare" button lets you pick two managers for a side-by-side breakdown. League-wide stats (records, champion history) live in a "League Records" section below the manager grid. This approach leans into the social/rivalry aspect — fantasy is about people, not abstract metrics. Browsing is driven by curiosity about specific managers.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Leans into rivalries — "let me check Mike's stats"</li>
+            <li>Manager profiles are highly shareable (screenshots)</li>
+            <li>Natural entry point — people are more interesting than categories</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>League-wide trends (scoring over time, draft patterns) are less prominent</li>
+            <li>Users need to know who they want to look at</li>
+            <li>Comparing more than 2 managers is cumbersome</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Insight Cards Feed -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">AI-Curated Insight Cards</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step highlight">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">"Frank has a 7-1 record vs. Mike since 2020"</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">"League scoring is up 12% vs last season" + chart</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">"Draft grade rankings: Frank A+, Mike C-" </span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">"Luck Index: you've been unlucky 4 of 5 weeks"</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">Tap any card → full detail view</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Instead of organizing by category, let the AI curate what's most interesting right now. The Analytics tab shows a feed of insight cards — each one is a bite-sized stat with a headline, a mini visualization, and context. The AI picks what to surface based on recency (what changed this week), relevance (your team, your rivals), and interestingness (unusual patterns, records being approached). Tap any card to drill into the full analysis. New cards appear after each week's games. This makes analytics feel alive and editorial rather than static tables — like a personalized stats newsletter.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Most engaging — always something new and relevant</li>
+            <li>AI curation surfaces insights users wouldn't find on their own</li>
+            <li>Feels alive — new cards after each week</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Hard to find a specific stat on demand</li>
+            <li>AI curation quality is make-or-break — bad picks kill trust</li>
+            <li>Ongoing LLM costs for generating insight cards</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Tabbed Analytics Sections -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Horizontal Tab Segments</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="sitemap">
+          <div class="sitemap-level">
+            <div class="sitemap-node active">Analytics Tab</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node primary">Rankings</div>
+            <div class="sitemap-node active">H2H</div>
+            <div class="sitemap-node primary">Trends</div>
+            <div class="sitemap-node primary">Draft</div>
+            <div class="sitemap-node primary">Records</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node secondary">← swipe between tabs →</div>
+          </div>
+          <div class="sitemap-connector"></div>
+          <div class="sitemap-level">
+            <div class="sitemap-node secondary">Each tab is a full-screen analytics view</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        A horizontal swipeable tab bar at the top of the Analytics screen: Rankings, H2H, Trends, Draft, Records. Each tab is its own full-screen analytics view — swipe left/right to move between them. This is the ESPN/Yahoo pattern (think their "Scoreboard" / "Standings" / "Players" tabs). Each sub-tab gets the full screen, so you can show rich charts, detailed tables, and interactive elements without space constraints. The trade-off is that you can't see what's in other tabs without swiping — less discoverable than a scroll, but each view is more focused.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Each category gets full screen — room for rich charts/tables</li>
+            <li>Familiar pattern from ESPN, Yahoo, and most sports apps</li>
+            <li>Swipe between sections is fast and fluid</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Less discoverable — can't see everything at a glance</li>
+            <li>5+ tabs feels crowded in horizontal space</li>
+            <li>Users may not realize there are more tabs off-screen</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Category Sections</th>
+            <th class="col-b">B: Manager Profiles</th>
+            <th class="col-c">C: AI Insight Cards</th>
+            <th class="col-d">D: Horizontal Tabs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Discoverability</td>
+            <td class="col-recommended">Best — scroll to see everything</td>
+            <td>Medium — need to tap into profiles</td>
+            <td>AI decides what you see</td>
+            <td>Medium — tabs hint at categories</td>
+          </tr>
+          <tr>
+            <td>Finding a Specific Stat</td>
+            <td class="col-recommended">Good — scroll to section, tap "See All"</td>
+            <td>Good — if you know which manager</td>
+            <td>Hard — depends on AI surfacing it</td>
+            <td>Good — go to relevant tab</td>
+          </tr>
+          <tr>
+            <td>Engagement / "Fun Factor"</td>
+            <td class="col-recommended">Medium — structured but static</td>
+            <td>High — people are interesting</td>
+            <td>Highest — always fresh, personalized</td>
+            <td>Medium — standard sports app feel</td>
+          </tr>
+          <tr>
+            <td>Rivalry / Social Feel</td>
+            <td class="col-recommended">Medium — H2H is one section</td>
+            <td>Best — managers are the entry point</td>
+            <td>Good — AI surfaces rivalry insights</td>
+            <td>Medium — H2H is one tab</td>
+          </tr>
+          <tr>
+            <td>Space for Rich Visualizations</td>
+            <td class="col-recommended">Medium — compact previews, detail on drill-in</td>
+            <td>Good — profile pages have room</td>
+            <td>Medium — card-sized visualizations</td>
+            <td>Best — full screen per category</td>
+          </tr>
+          <tr>
+            <td>Build Complexity</td>
+            <td class="col-recommended">Medium — sections + detail views</td>
+            <td>Medium — profile views + comparison</td>
+            <td>High — AI curation, card generation</td>
+            <td>Low — standard tabbed layout</td>
+          </tr>
+          <tr>
+            <td>Scales with New Analytics</td>
+            <td class="col-recommended">Good — add new sections</td>
+            <td>Good — add stats to profiles</td>
+            <td>Great — AI auto-surfaces new metrics</td>
+            <td>Medium — more tabs gets crowded</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

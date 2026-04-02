@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 1: Platform & Frontend Stack — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .decision-number {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin-top: 0.25rem;
+    }
+
+    .category-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 0.5rem;
+    }
+
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+
+    .decision-description {
+      font-size: 1rem;
+      color: #475569;
+      margin-top: 0.75rem;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+
+    .instruction {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      display: inline-block;
+      border: 1px solid #bfdbfe;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto 3rem;
+    }
+
+    .option-card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+      border: 2px solid #e2e8f0;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .option-card:hover {
+      border-color: #6366f1;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.12);
+    }
+
+    .card-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .card-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .option-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+
+    .option-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .recommended-badge {
+      background: #f59e0b;
+      color: white;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .option-card.chosen {
+      border: 3px solid #059669;
+      box-shadow: 0 4px 20px rgba(5,150,105,0.15);
+    }
+
+    .option-card.chosen:hover {
+      border-color: #059669;
+    }
+
+    .card-badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .chosen-badge {
+      background: #059669;
+      color: white;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      display: none;
+    }
+
+    .option-card.chosen .chosen-badge {
+      display: inline-block;
+    }
+
+    .option-card.not-chosen {
+      opacity: 0.55;
+      filter: grayscale(20%);
+    }
+
+    .option-card.not-chosen:hover {
+      opacity: 0.8;
+      filter: none;
+    }
+
+    .visual-preview {
+      padding: 1.5rem;
+      background: #f8fafc;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+
+    .option-summary {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      color: #334155;
+      line-height: 1.65;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .verdict {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+
+    .pros h3, .cons h3 {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+
+    .verdict ul { list-style: none; padding: 0; }
+
+    .verdict li {
+      font-size: 0.8rem;
+      color: #475569;
+      line-height: 1.5;
+      padding: 0.15rem 0;
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+
+    .card-footer {
+      padding: 0.75rem 1.25rem;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .tell-claude {
+      font-size: 0.75rem;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      display: block;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    .comparison-section {
+      max-width: 1200px;
+      margin: 0 auto 3rem;
+    }
+
+    .comparison-section h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 1rem;
+    }
+
+    .comparison-table-wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      font-size: 0.85rem;
+    }
+
+    .comparison-table th {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-bottom: 2px solid #e2e8f0;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      background: white;
+    }
+
+    .comparison-table th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #f8fafc;
+      color: #64748b;
+    }
+
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+
+    .comparison-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+
+    .comparison-table td:first-child {
+      font-weight: 600;
+      color: #475569;
+      position: sticky;
+      left: 0;
+      background: #f8fafc;
+    }
+
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+
+    .comparison-table tr:last-child td { border-bottom: none; }
+
+    .page-footer {
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .page-footer p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin: 0.3rem 0;
+    }
+
+    .page-footer strong {
+      color: #334155;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      color: #6366f1;
+      text-decoration: none;
+      max-width: 1200px;
+    }
+
+    .back-link:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      .options-grid { grid-template-columns: 1fr; }
+      body { padding: 1rem; }
+    }
+
+    .arch-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 0.5rem;
+      width: 100%;
+    }
+
+    .arch-layer {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .arch-box {
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #334155;
+      text-align: center;
+      min-width: 70px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .arch-box.frontend { border-color: #7c3aed; color: #7c3aed; }
+    .arch-box.backend { border-color: #0891b2; color: #0891b2; }
+    .arch-box.database { border-color: #059669; color: #059669; }
+    .arch-box.service { border-color: #dc2626; color: #dc2626; }
+    .arch-box.platform { border-color: #ea580c; color: #ea580c; }
+    .arch-box.native { border-color: #0f172a; color: #0f172a; }
+
+    .arch-arrow {
+      font-size: 1rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    .arch-note {
+      font-size: 0.6rem;
+      color: #94a3b8;
+      text-align: center;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 1 of 12</span>
+    <h1>Platform & Frontend Stack (iOS)</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      We're building an iOS app for Fantasy League Hub. The big question: do you go fully native with Swift, or use React Native to write in JavaScript/TypeScript? Native gives you the best possible iOS experience — buttery animations, Swift Charts, deep system integration. React Native lets you share language with your backend (TypeScript everywhere) and iterate faster, with the option to add Android or web later. For a data-heavy app with charts, tables, and an AI chat, both paths are viable — the trade-offs are around polish vs. velocity and how much you value feeling "truly iOS."
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: SwiftUI Native -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">SwiftUI Native</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box native">SwiftUI Views</div>
+            <div class="arch-box native">Swift Charts</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box frontend">Swift Data Layer</div>
+            <div class="arch-box frontend">Async/Await</div>
+          </div>
+          <div class="arch-arrow">↕ REST / GraphQL</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Backend API</div>
+            <div class="arch-box service">Push (APNs)</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box database">Database</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Go all-in on Apple's modern framework. SwiftUI gives you declarative UI that feels instantly "iOS" — native navigation, gestures, and animations out of the box. The killer feature here is Swift Charts, Apple's own charting framework — it's gorgeous, performant, and deeply integrated with accessibility and Dynamic Type. For a data-heavy analytics app, having charts that feel like a native part of iOS is a real differentiator. You also get seamless access to APNs (push notifications), widgets, Live Activities for game-day scores, and SharePlay for watching stats with leaguemates. This is my recommendation because the analytics experience will feel premium and the iOS-specific features (widgets, Live Activities) are perfect for fantasy football.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want the most polished, "feels like Apple made it" experience</li>
+            <li>Swift Charts gives you beautiful, accessible data viz for free</li>
+            <li>iOS-only features matter: widgets, Live Activities, SharePlay</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Swift is a different language from your backend — no code sharing</li>
+            <li>SwiftUI still has rough edges with complex lists and navigation</li>
+            <li>If you ever want Android, you're starting from scratch</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: React Native (Expo) -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">React Native Expo</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">React Native UI</div>
+            <div class="arch-box frontend">Victory Native / RN Charts</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box frontend">TypeScript Data Layer</div>
+            <div class="arch-box frontend">TanStack Query</div>
+          </div>
+          <div class="arch-arrow">↕ REST / tRPC</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Node.js API (TypeScript)</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box database">Database</div>
+          </div>
+          <div class="arch-note">TypeScript everywhere — shared types between app & API</div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Build the iOS app with React Native using Expo's managed workflow. You write TypeScript — the same language as your backend — so you can share type definitions, validation logic, and data models between the app and server. Expo handles the build pipeline, over-the-air updates (push a fix without going through App Store review), and gives you a solid set of native modules out of the box. Charting is good but not great — Victory Native and react-native-chart-kit work, but they're not as polished as Swift Charts. The big win is development speed and the option to add Android later with the same codebase.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>TypeScript everywhere — shared types and logic with backend</li>
+            <li>Faster development cycle with hot reload and OTA updates</li>
+            <li>Android becomes possible later without a rewrite</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Charts and data tables won't feel as native or polished</li>
+            <li>No access to iOS-specific features like Live Activities or widgets</li>
+            <li>Performance can lag on complex animated charts</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: SwiftUI + UIKit Hybrid -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Swift Hybrid (SwiftUI + UIKit)</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box native">SwiftUI (Dashboards, Chat)</div>
+          </div>
+          <div class="arch-arrow">↕ mixed</div>
+          <div class="arch-layer">
+            <div class="arch-box frontend">UIKit (Complex Tables, Grids)</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box frontend">Swift Data Layer</div>
+            <div class="arch-box native">Swift Charts</div>
+          </div>
+          <div class="arch-arrow">↕ REST / GraphQL</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Backend API</div>
+          </div>
+          <div class="arch-note">Use the right tool for each screen</div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Use SwiftUI for most of the app — dashboards, the AI chat interface, settings, onboarding — but drop into UIKit for screens that need it, like complex data tables, custom collection layouts, or highly customized scroll behavior. This is how many production iOS apps work in practice. SwiftUI is great for 80% of screens, but fantasy analytics will have dense data grids (matchup history, roster comparisons) where UIKit's UICollectionView gives you more control. You still get Swift Charts, widgets, and all the native goodies.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want native polish but need UIKit's power for dense data views</li>
+            <li>Battle-tested approach used by most large iOS apps</li>
+            <li>Best of both worlds — SwiftUI speed + UIKit flexibility</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Two UI paradigms to maintain — more cognitive overhead</li>
+            <li>Navigation between SwiftUI and UIKit screens can be tricky</li>
+            <li>Still no code sharing with backend</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: React Native Bare -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">React Native Bare + Native Modules</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box frontend">React Native UI (TypeScript)</div>
+          </div>
+          <div class="arch-arrow">↕ bridge</div>
+          <div class="arch-layer">
+            <div class="arch-box native">Swift Charts Module</div>
+            <div class="arch-box native">Widgets Module</div>
+          </div>
+          <div class="arch-arrow">↕</div>
+          <div class="arch-layer">
+            <div class="arch-box frontend">TypeScript Data Layer</div>
+          </div>
+          <div class="arch-arrow">↕ REST / tRPC</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Node.js API (TypeScript)</div>
+          </div>
+          <div class="arch-note">TypeScript app shell + Swift for native features</div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Get the best of both worlds: write most of the app in React Native (TypeScript, fast iteration, shared logic with backend) but build custom native modules in Swift for the parts that matter most — Swift Charts for gorgeous data viz, native widgets for home screen stats, and Live Activities for game-day scores. This is the "have your cake and eat it too" option. The trade-off is complexity: you're maintaining two languages, a bridge layer, and the bare React Native workflow (no Expo managed convenience). It's more work to set up but gives you TypeScript velocity where it helps and native quality where it counts.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want TypeScript velocity AND native iOS features</li>
+            <li>Swift Charts via native module for premium data viz</li>
+            <li>Can still share types and logic with backend</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Most complex setup — two languages, bridge layer to maintain</li>
+            <li>No Expo managed workflow — harder build pipeline</li>
+            <li>Native module bugs are harder to debug than pure Swift or pure RN</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: SwiftUI Native</th>
+            <th class="col-b">B: React Native Expo</th>
+            <th class="col-c">C: Swift Hybrid</th>
+            <th class="col-d">D: RN Bare + Native</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Charting Quality</td>
+            <td class="col-recommended">Excellent — Swift Charts is best-in-class</td>
+            <td>Good — Victory Native, functional but not premium</td>
+            <td>Excellent — Swift Charts</td>
+            <td>Excellent — Swift Charts via native module</td>
+          </tr>
+          <tr>
+            <td>Development Speed</td>
+            <td class="col-recommended">Medium — SwiftUI is productive but compile times</td>
+            <td>Fast — hot reload, OTA updates, familiar web tooling</td>
+            <td>Slower — two paradigms to context-switch between</td>
+            <td>Medium — fast for RN parts, slow for native modules</td>
+          </tr>
+          <tr>
+            <td>iOS-Native Features</td>
+            <td class="col-recommended">Full — widgets, Live Activities, SharePlay, Shortcuts</td>
+            <td>Limited — basic push only, no widgets or Live Activities</td>
+            <td>Full — same as SwiftUI</td>
+            <td>Partial — available via custom modules (extra work)</td>
+          </tr>
+          <tr>
+            <td>Code Sharing with Backend</td>
+            <td class="col-recommended">None — Swift vs TypeScript/Python</td>
+            <td>High — shared TypeScript types, validation, models</td>
+            <td>None — Swift vs TypeScript/Python</td>
+            <td>Partial — TypeScript parts share, Swift parts don't</td>
+          </tr>
+          <tr>
+            <td>Complex Data Tables</td>
+            <td class="col-recommended">Good — LazyVGrid, but limited customization</td>
+            <td>Decent — FlatList + custom cells, can feel janky</td>
+            <td>Best — UICollectionView for complex layouts</td>
+            <td>Decent — same RN limits, can bridge to UIKit</td>
+          </tr>
+          <tr>
+            <td>Future Android Path</td>
+            <td class="col-recommended">Full rewrite required</td>
+            <td>Same codebase — flip a switch</td>
+            <td>Full rewrite required</td>
+            <td>Mostly shared — native modules need Kotlin versions</td>
+          </tr>
+          <tr>
+            <td>App Store Polish</td>
+            <td class="col-recommended">Premium — feels like a first-party app</td>
+            <td>Good — but experienced users may notice it's not native</td>
+            <td>Premium — native feel throughout</td>
+            <td>Good to great — depends on how much is bridged</td>
+          </tr>
+          <tr>
+            <td>Setup & Maintenance Complexity</td>
+            <td class="col-recommended">Low — one language, one toolchain (Xcode)</td>
+            <td>Low — Expo handles builds and config</td>
+            <td>Medium — two UI paradigms, one language</td>
+            <td>High — two languages, bridge layer, custom build</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

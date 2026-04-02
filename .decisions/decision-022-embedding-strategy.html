@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 22: Embedding Strategy & pgvector Schema — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.25rem; background: #f8fafc; display: flex; align-items: flex-start; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    /* Schema diagram */
+    .schema-diagram { display: flex; flex-direction: column; gap: 6px; width: 100%; font-size: 0.68rem; }
+    .schema-table { background: white; border: 2px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .schema-table.new { border-color: #7c3aed; }
+    .schema-table.modified { border-color: #f59e0b; }
+    .schema-header { padding: 5px 10px; font-weight: 700; font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase; }
+    .schema-table.new .schema-header { background: #ede9fe; color: #6d28d9; }
+    .schema-table.modified .schema-header { background: #fef9c3; color: #854d0e; }
+    .schema-table.existing .schema-header { background: #f1f5f9; color: #475569; }
+    .schema-row { padding: 3px 10px; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; color: #334155; }
+    .schema-row .field { font-family: monospace; }
+    .schema-row .type { color: #64748b; font-size: 0.62rem; }
+    .schema-row.vector { background: #faf5ff; }
+    .schema-row.vector .field { color: #7c3aed; font-weight: 700; }
+    .schema-note { font-size: 0.6rem; color: #64748b; padding: 4px 10px; background: #f8fafc; border-top: 1px solid #f1f5f9; font-style: italic; }
+    .schema-legend { display: flex; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+    .schema-legend-item { font-size: 0.6rem; display: flex; align-items: center; gap: 4px; }
+    .schema-legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+    .schema-arrow { font-size: 0.8rem; color: #94a3b8; text-align: center; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 22 of 25</span>
+    <h1>Embedding Strategy & pgvector Schema</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      Per the Jahnel Group principles, chunking strategy is a first-class architectural decision — not an implementation detail to figure out later. This decision defines what data gets embedded, how it's chunked, where the vectors live in Postgres, and when embeddings are generated. The choice shapes the Prisma migration, the BullMQ embedding job, and ultimately how good the AI's retrieval is when answering questions about your league.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option B but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- Option A: Dedicated Embedding table -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Dedicated Embedding Table</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="schema-diagram">
+          <div class="schema-legend">
+            <div class="schema-legend-item"><div class="schema-legend-dot" style="background:#7c3aed;"></div> New table</div>
+            <div class="schema-legend-item"><div class="schema-legend-dot" style="background:#f59e0b;"></div> Modified</div>
+          </div>
+          <div class="schema-table new">
+            <div class="schema-header">Embedding (new)</div>
+            <div class="schema-row"><span class="field">id</span><span class="type">String</span></div>
+            <div class="schema-row"><span class="field">leagueId</span><span class="type">String</span></div>
+            <div class="schema-row"><span class="field">sourceType</span><span class="type">EmbeddingSource enum</span></div>
+            <div class="schema-row"><span class="field">sourceId</span><span class="type">String</span></div>
+            <div class="schema-row"><span class="field">content</span><span class="type">String (chunk text)</span></div>
+            <div class="schema-row vector"><span class="field">embedding</span><span class="type">Unsupported("vector(1536)")</span></div>
+            <div class="schema-row"><span class="field">createdAt</span><span class="type">DateTime</span></div>
+            <div class="schema-note">sourceType: SEASON_SUMMARY | MATCHUP | MANAGER_CAREER | DRAFT | TRANSACTIONS</div>
+          </div>
+          <div class="schema-arrow">↑ references any source row by (sourceType, sourceId)</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        One dedicated <code>embeddings</code> table holds all vectors with a polymorphic reference back to the source: <code>(sourceType, sourceId)</code> points to a Matchup, Season, Manager, etc. The <code>content</code> field stores the human-readable text that was embedded, so you can show it when debugging retrieval. Each chunk is an independent row — a manager's career might produce 3 chunks, a full season summary produces 1. Clean separation: the main schema is untouched, and you can re-embed everything by truncating one table.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Clean separation — main schema untouched, easy to re-embed</li>
+            <li>Supports multiple chunk sizes per source without schema changes</li>
+            <li>Debug retrieval by reading <code>content</code> field directly</li>
+            <li>Easy to wipe and rebuild: <code>TRUNCATE embeddings</code></li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>JOIN required to get source data alongside embedding results</li>
+            <li>No FK enforcement — sourceId is a string, not a typed FK</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Vector column on each model -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Vector Column Per Model</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="schema-diagram">
+          <div class="schema-legend">
+            <div class="schema-legend-item"><div class="schema-legend-dot" style="background:#f59e0b;"></div> Modified (vector column added)</div>
+          </div>
+          <div class="schema-table modified">
+            <div class="schema-header">Season (modified)</div>
+            <div class="schema-row"><span class="field">id, leagueId, year…</span><span class="type">existing</span></div>
+            <div class="schema-row vector"><span class="field">embedding</span><span class="type">vector(1536)?</span></div>
+          </div>
+          <div class="schema-arrow">+</div>
+          <div class="schema-table modified">
+            <div class="schema-header">Manager (modified)</div>
+            <div class="schema-row"><span class="field">id, name, leagueId…</span><span class="type">existing</span></div>
+            <div class="schema-row vector"><span class="field">embedding</span><span class="type">vector(1536)?</span></div>
+          </div>
+          <div class="schema-arrow">+</div>
+          <div class="schema-table modified">
+            <div class="schema-header">Matchup (modified)</div>
+            <div class="schema-row"><span class="field">id, week, scores…</span><span class="type">existing</span></div>
+            <div class="schema-row vector"><span class="field">embedding</span><span class="type">vector(1536)?</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Add a nullable <code>embedding vector(1536)</code> column directly to each model that needs one: Season, Manager, Matchup. No new table — vectors live alongside the data they describe. The big limitation: one row = one embedding. A manager with 14 seasons of history produces one vector, which forces you to cram everything into one chunk or lose detail. Works if queries are always at the model level ("tell me about manager X") but breaks for fine-grained retrieval ("what happened in week 7 of 2019").
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Simpler schema — no new table, no polymorphic joins</li>
+            <li>One-to-one: each row has exactly one embedding</li>
+            <li>Strong FK enforcement — vector is part of the model</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>One chunk per row forces oversized chunks — hurts retrieval quality</li>
+            <li>Can't have multiple chunk sizes per source</li>
+            <li>Re-embedding requires ALTERing production columns</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Embed season summaries only (minimal) -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Season Summaries Only (Skip pgvector)</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="schema-diagram">
+          <div class="schema-table new">
+            <div class="schema-header">LeagueSummary (new)</div>
+            <div class="schema-row"><span class="field">id</span><span class="type">String</span></div>
+            <div class="schema-row"><span class="field">leagueId</span><span class="type">String</span></div>
+            <div class="schema-row"><span class="field">year</span><span class="type">Int (null = all-time)</span></div>
+            <div class="schema-row"><span class="field">summaryText</span><span class="type">String (narrative)</span></div>
+            <div class="schema-row vector"><span class="field">embedding</span><span class="type">vector(1536)?</span></div>
+            <div class="schema-row"><span class="field">generatedAt</span><span class="type">DateTime</span></div>
+          </div>
+          <div class="schema-note">Only high-level narrative summaries are embedded. Individual matchups/picks accessed via tools directly.</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Skip embedding individual matchups, managers, and picks entirely. Instead generate high-level narrative summaries per season (e.g. "2022: franknardone won the championship with a 10-3 record, beating blake in the finals 147-112…") and embed those. All specific data still comes from structured tool calls — pgvector is only used for broad narrative context. Fastest to implement and lowest embedding cost, but retrieval is coarse.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Fastest to ship — minimal schema, minimal embedding cost</li>
+            <li>GPT-4o tool calls handle all specific stats anyway</li>
+            <li>Good enough for most "what happened in 2022" questions</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Poor retrieval for specific queries ("who did I beat most in week 10")</li>
+            <li>Narrative summaries may go stale as data changes</li>
+            <li>Harder to retrofit fine-grained embeddings later</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Tools-first, embeddings deferred -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Tools-First, Embeddings Deferred</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="schema-diagram">
+          <div class="schema-table existing">
+            <div class="schema-header">No schema changes yet</div>
+            <div class="schema-row"><span class="field">All existing tables</span><span class="type">unchanged</span></div>
+          </div>
+          <div class="schema-arrow">↓ Phase 2b: AI chat ships using only tools</div>
+          <div class="schema-table new" style="border-color:#94a3b8;">
+            <div class="schema-header" style="background:#f1f5f9;color:#64748b;">Embedding table (later)</div>
+            <div class="schema-row" style="opacity:0.5;"><span class="field">Added after tool-only version ships</span><span class="type">—</span></div>
+          </div>
+          <div class="schema-note">Ship AI chat with pure tool use (no pgvector). Add embeddings in a follow-on once you've observed real query patterns.</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Don't add pgvector at all for the initial AI chat release. Build the entire chat experience using structured tool calls only (query_standings, query_h2h, query_scoring, etc.). The tools cover 90% of questions users will ask. Add pgvector as a follow-on once you've seen real usage and know which query types the tools can't handle. This respects the "ship real systems and learn from what breaks" principle from the Jahnel expert tier.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Fastest path to shipping AI chat — no embedding pipeline to build first</li>
+            <li>Tools handle the structured stats queries that 90% of users will ask</li>
+            <li>Lets real usage patterns inform what to embed</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Fuzzy/narrative questions ("who's my biggest rival historically") fall back to LLM guessing</li>
+            <li>Retrofitting pgvector after launch is a second migration and deployment</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Dedicated Table</th>
+            <th class="col-b">B: Vector Per Model</th>
+            <th class="col-c">C: Summaries Only</th>
+            <th class="col-d">D: Tools-First, Defer</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>What gets embedded</td>
+            <td class="col-recommended">Matchups, manager careers, seasons, drafts (chunked)</td>
+            <td>One embedding per Season / Manager / Matchup row</td>
+            <td>Generated narrative summaries per season</td>
+            <td>Nothing yet</td>
+          </tr>
+          <tr>
+            <td>Chunk strategy</td>
+            <td class="col-recommended">Multiple chunks per source — tunable</td>
+            <td>One chunk per row — forced by schema</td>
+            <td>One summary per season</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td>Prisma migration complexity</td>
+            <td class="col-recommended">Medium — 1 new table + pgvector extension</td>
+            <td>Medium — add column to 3+ existing tables</td>
+            <td>Low — 1 new table, no changes to existing</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Re-embedding ease</td>
+            <td class="col-recommended">Easy — TRUNCATE embeddings, re-run job</td>
+            <td>Hard — UPDATE across multiple tables</td>
+            <td>Easy — regenerate summaries</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td>Retrieval quality</td>
+            <td class="col-recommended">High — fine-grained chunks match query intent</td>
+            <td>Medium — one big chunk per row loses detail</td>
+            <td>Low — only broad narrative queries work well</td>
+            <td>N/A (tools only)</td>
+          </tr>
+          <tr>
+            <td>Time to ship AI chat</td>
+            <td class="col-recommended">Medium — need embedding pipeline first</td>
+            <td>Medium — same</td>
+            <td>Fast — fewer embeddings to generate</td>
+            <td>Fastest — no embedding work needed</td>
+          </tr>
+          <tr>
+            <td>Embedding cost (14 seasons)</td>
+            <td class="col-recommended">Low (~$0.01 total at $0.02/M tokens)</td>
+            <td>Low</td>
+            <td>Lowest</td>
+            <td>$0</td>
+          </tr>
+          <tr>
+            <td>Observability / debug</td>
+            <td class="col-recommended">High — content field shows what was retrieved</td>
+            <td>Medium — need JOIN to see source data</td>
+            <td>Medium</td>
+            <td>N/A</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option D"</strong>, or <strong>"Option A but [your change]"</strong></p>
+    <p>To change a past decision: <strong>"for decision-022 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

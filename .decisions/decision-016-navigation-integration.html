@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 16: Navigation Integration — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.ia { background: #ecfdf5; color: #047857; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "\2713 "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    /* Tab bar mockup styles */
+    .tab-bar-mockup {
+      width: 100%;
+      max-width: 320px;
+      background: #1A1A1A;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .tab-bar-screen {
+      padding: 12px 16px;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tab-bar-screen-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #E8E2D6;
+    }
+    .tab-bar-screen-subtitle {
+      font-size: 0.6rem;
+      color: #94a3b8;
+    }
+    .tab-bar-bottom {
+      display: flex;
+      background: #111111;
+      border-top: 1px solid #333;
+      padding: 6px 0 4px;
+    }
+    .tab-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 2px 0;
+    }
+    .tab-icon {
+      font-size: 0.85rem;
+      color: #666;
+    }
+    .tab-label {
+      font-size: 0.5rem;
+      font-weight: 600;
+      color: #666;
+    }
+    .tab-item.active .tab-icon,
+    .tab-item.active .tab-label {
+      color: #C9A96E;
+    }
+    .tab-item.new .tab-icon,
+    .tab-item.new .tab-label {
+      color: #6366f1;
+    }
+    .tab-item.new .tab-label {
+      font-weight: 800;
+    }
+    .new-badge {
+      font-size: 0.4rem;
+      background: #6366f1;
+      color: white;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">&larr; All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 16 of 19</span>
+    <h1>Navigation Integration</h1>
+    <span class="category-badge ia">Information Architecture</span>
+    <p class="decision-description">
+      Your app currently has a 5-tab bar: Dashboard, Analytics, League, AI Chat (V2 placeholder), and Profile. You're adding three new views: Feed (social/news), Recommendations (waiver/start-sit signals), and Player Detail (aggregate intelligence). The question is where these live. Adding more tabs risks overcrowding the tab bar on smaller phones. Nesting them under existing tabs might hide them. This is a genuine IA tension -- the intelligence layer is big enough to deserve its own top-level presence, but you're already at 5 tabs.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> &middot; <strong>"Option A but [change]"</strong> &middot; <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Replace AI Chat tab -->
+    <article class="option-card option-a not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Replace AI Chat Tab</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="tab-bar-mockup">
+          <div class="tab-bar-screen">
+            <div class="tab-bar-screen-title">Intel Feed</div>
+            <div class="tab-bar-screen-subtitle">Feed &rarr; Recommendations &rarr; Player Detail (push navigation)</div>
+            <div style="display:flex;gap:4px;margin-top:8px">
+              <div style="background:#C9A96E22;border:1px solid #C9A96E44;border-radius:6px;padding:3px 8px;font-size:0.55rem;color:#C9A96E;font-weight:600">All</div>
+              <div style="background:#333;border-radius:6px;padding:3px 8px;font-size:0.55rem;color:#999;font-weight:600">My Team</div>
+              <div style="background:#333;border-radius:6px;padding:3px 8px;font-size:0.55rem;color:#999;font-weight:600">Waivers</div>
+            </div>
+          </div>
+          <div class="tab-bar-bottom">
+            <div class="tab-item active">
+              <span class="tab-icon">&#9633;</span>
+              <span class="tab-label">Dashboard</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9650;</span>
+              <span class="tab-label">Analytics</span>
+            </div>
+            <div class="tab-item new">
+              <span class="tab-icon">&#9881;</span>
+              <span class="tab-label">Intel</span>
+              <span class="new-badge">NEW</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9878;</span>
+              <span class="tab-label">League</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9679;</span>
+              <span class="tab-label">Profile</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        The AI Chat tab is a V2 placeholder that isn't built yet. Replace it with an "Intel" tab that houses the intelligence platform. Feed is the root view, Recommendations and Player Detail are reached via push navigation within the tab. When AI Chat eventually ships in a later phase, it becomes a floating button or sheet accessible from any screen -- arguably a better UX than a dedicated tab anyway. This keeps you at 5 tabs total with no overcrowding. I recommend this because it gives Intelligence top-level visibility without adding tab bar clutter.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Stays at 5 tabs -- no crowding on small screens</li>
+            <li>AI Chat wasn't built yet, so nothing to break</li>
+            <li>Intel gets prime tab real estate for maximum discoverability</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>AI Chat needs a new home later -- floating button or sheet pattern</li>
+            <li>Three views (Feed, Recs, Detail) in one tab could feel deep</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Add 6th Tab -->
+    <article class="option-card option-b chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Add Sixth Tab</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="tab-bar-mockup">
+          <div class="tab-bar-screen">
+            <div class="tab-bar-screen-title">Intel Feed</div>
+            <div class="tab-bar-screen-subtitle">Dedicated tab alongside AI Chat</div>
+          </div>
+          <div class="tab-bar-bottom">
+            <div class="tab-item active">
+              <span class="tab-icon">&#9633;</span>
+              <span class="tab-label">Home</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9650;</span>
+              <span class="tab-label">Stats</span>
+            </div>
+            <div class="tab-item new">
+              <span class="tab-icon">&#9881;</span>
+              <span class="tab-label">Intel</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9878;</span>
+              <span class="tab-label">League</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9673;</span>
+              <span class="tab-label">AI</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9679;</span>
+              <span class="tab-label">More</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Keep the AI Chat tab and add Intel as a 6th tab. iOS supports up to 5 visible tabs before auto-creating a "More" overflow, but many apps (Instagram, YouTube) successfully use 5 without issue. With 6, the last tab becomes "More" containing Profile -- or you shorten all labels to fit. This preserves the AI Chat tab's slot for when you build it, but makes the tab bar tighter. On iPhone SE/Mini screens, 6 tabs can feel cramped.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Both Intel and AI Chat deserve permanent top-level access</li>
+            <li>Users on larger phones won't notice the tight spacing</li>
+            <li>No need to redesign when AI Chat ships later</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>6 tabs triggers iOS "More" overflow on smaller screens</li>
+            <li>AI Chat tab would sit empty until that phase ships</li>
+            <li>Tab labels need to be very short to fit (3-5 chars)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Nest Under Dashboard -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Dashboard Sub-Sections</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="tab-bar-mockup">
+          <div class="tab-bar-screen">
+            <div class="tab-bar-screen-title">Dashboard</div>
+            <div style="display:flex;gap:4px;margin-top:6px">
+              <div style="background:#C9A96E;border-radius:6px;padding:3px 8px;font-size:0.55rem;color:#1A1A1A;font-weight:700">Overview</div>
+              <div style="background:#333;border-radius:6px;padding:3px 8px;font-size:0.55rem;color:#C9A96E;font-weight:600;border:1px solid #C9A96E44">Feed</div>
+              <div style="background:#333;border-radius:6px;padding:3px 8px;font-size:0.55rem;color:#C9A96E;font-weight:600;border:1px solid #C9A96E44">Recs</div>
+            </div>
+            <div class="tab-bar-screen-subtitle" style="margin-top:6px">Segmented control switches between existing dashboard and new intel views</div>
+          </div>
+          <div class="tab-bar-bottom">
+            <div class="tab-item active">
+              <span class="tab-icon">&#9633;</span>
+              <span class="tab-label">Dashboard</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9650;</span>
+              <span class="tab-label">Analytics</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9673;</span>
+              <span class="tab-label">AI Chat</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9878;</span>
+              <span class="tab-label">League</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9679;</span>
+              <span class="tab-label">Profile</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Keep the existing 5 tabs untouched. Add Feed and Recommendations as sub-sections within the Dashboard tab, using a segmented control or horizontal scroll at the top to switch between "Overview" (existing dashboard), "Feed", and "Recs". Player Detail is accessed by tapping any player mention in any view. This is the least disruptive option -- the tab bar doesn't change at all, and intelligence data lives right next to existing dashboard analytics.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Zero disruption to existing navigation structure</li>
+            <li>Dashboard becomes a "command center" with multiple perspectives</li>
+            <li>Easy to A/B test -- users can ignore the new sections</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Feed and Recommendations are hidden behind a tab-within-a-tab</li>
+            <li>Dashboard already has a lot of content (Pulse, superlatives, sparkline)</li>
+            <li>Discoverability suffers -- new users may never find Intel sections</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Contextual Surfaces -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Distributed Intel</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="tab-bar-mockup">
+          <div class="tab-bar-screen">
+            <div class="tab-bar-screen-title">Dashboard</div>
+            <div style="margin-top:6px;background:#C9A96E11;border:1px solid #C9A96E33;border-radius:8px;padding:6px 8px">
+              <div style="font-size:0.5rem;font-weight:700;color:#C9A96E;text-transform:uppercase;letter-spacing:0.05em">Intel Spotlight</div>
+              <div style="font-size:0.6rem;color:#E8E2D6;margin-top:2px">3 signals for your roster &rarr;</div>
+            </div>
+            <div style="margin-top:4px;font-size:0.5rem;color:#666">+ intel cards in Analytics, League, Manager Profile...</div>
+          </div>
+          <div class="tab-bar-bottom">
+            <div class="tab-item active">
+              <span class="tab-icon">&#9633;</span>
+              <span class="tab-label">Dashboard</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9650;</span>
+              <span class="tab-label">Analytics</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9673;</span>
+              <span class="tab-label">AI Chat</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9878;</span>
+              <span class="tab-label">League</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">&#9679;</span>
+              <span class="tab-label">Profile</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        No dedicated Intel tab at all. Instead, distribute intelligence signals across existing views contextually. The Dashboard gets an "Intel Spotlight" card showing top signals for your roster. Analytics views get "social buzz" sections for relevant players. Manager profiles show recommendations for their team. Player Detail becomes a sheet accessible from any player mention anywhere. This is the most integrated approach -- intelligence is woven into the fabric of the app rather than siloed.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Intelligence feels native, not bolted on -- it's everywhere contextually</li>
+            <li>No tab bar changes, no navigation redesign</li>
+            <li>Users encounter intel naturally while doing what they already do</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>No single place to browse all intelligence -- no "power user" destination</li>
+            <li>Much harder to build -- touching many existing views vs. one new tab</li>
+            <li>Filterable feed with source/team/player controls needs a home somewhere</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Replace AI Chat</th>
+            <th class="col-b">B: Add 6th Tab</th>
+            <th class="col-c">C: Dashboard Sub</th>
+            <th class="col-d">D: Distributed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Tab bar changes</td>
+            <td class="col-recommended">Rename 1 tab (AI Chat &rarr; Intel)</td>
+            <td>Add 1 tab (6 total)</td>
+            <td>None</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Discoverability</td>
+            <td class="col-recommended">High -- top-level tab</td>
+            <td>High -- top-level tab</td>
+            <td>Low -- hidden in sub-section</td>
+            <td>Medium -- scattered contextually</td>
+          </tr>
+          <tr>
+            <td>Impact on existing views</td>
+            <td class="col-recommended">Minimal -- just the tab swap</td>
+            <td>Minimal -- additive only</td>
+            <td>Moderate -- Dashboard gets complex</td>
+            <td>High -- changes many existing views</td>
+          </tr>
+          <tr>
+            <td>AI Chat future</td>
+            <td class="col-recommended">Becomes floating button/sheet</td>
+            <td>Keeps its tab</td>
+            <td>Keeps its tab</td>
+            <td>Keeps its tab</td>
+          </tr>
+          <tr>
+            <td>Full feed browsing</td>
+            <td class="col-recommended">Yes -- Feed is root view of Intel tab</td>
+            <td>Yes -- Feed is root view of Intel tab</td>
+            <td>Yes -- but nested in Dashboard</td>
+            <td>No dedicated feed view</td>
+          </tr>
+          <tr>
+            <td>Build complexity</td>
+            <td class="col-recommended">Low -- 1 new tab with 3 views</td>
+            <td>Low -- 1 new tab with 3 views</td>
+            <td>Medium -- segmented control in Dashboard</td>
+            <td>High -- widget system across many views</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-015 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 25: Conversation History Storage — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.25rem; background: #f8fafc; display: flex; align-items: flex-start; justify-content: center; flex: 1; min-height: 180px; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .arch-diagram { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0.5rem; width: 100%; }
+    .arch-layer { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; width: 100%; }
+    .arch-box { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; font-size: 0.68rem; font-weight: 600; color: #334155; text-align: center; min-width: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .arch-box.frontend { border-color: #7c3aed; color: #7c3aed; }
+    .arch-box.backend { border-color: #0891b2; color: #0891b2; }
+    .arch-box.database { border-color: #059669; color: #059669; }
+    .arch-box.cache { border-color: #f59e0b; color: #b45309; }
+    .arch-box.device { border-color: #6366f1; color: #4338ca; }
+    .arch-arrow { font-size: 0.9rem; color: #94a3b8; text-align: center; }
+    .arch-label { font-size: 0.6rem; color: #94a3b8; text-align: center; font-style: italic; }
+
+    .schema-preview { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.62rem; background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 8px; line-height: 1.7; width: 100%; }
+    .schema-model { color: #c9a96e; }
+    .schema-field { color: #7dd3fc; }
+    .schema-type { color: #86efac; }
+    .schema-comment { color: #64748b; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 25 of 28</span>
+    <h1>Conversation History Storage</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      When a user asks "who was my best manager in 2023?" and you answer, does that context carry forward to the next question? Where do those messages live — in Postgres, in Redis, on the device, or nowhere at all? This decision determines whether chat feels like a persistent memory or a disposable notepad, and how much the API needs to manage state between requests.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- OPTION A: Persistent DB Threads -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Persistent DB Threads</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%">
+          <div class="schema-preview">
+<span class="schema-model">model</span> <span class="schema-field">ChatThread</span> {
+  id        String   <span class="schema-type">@id @default(cuid())</span>
+  userId    String
+  leagueId  String
+  createdAt DateTime <span class="schema-type">@default(now())</span>
+  messages  <span class="schema-field">ChatMessage[]</span>
+}
+
+<span class="schema-model">model</span> <span class="schema-field">ChatMessage</span> {
+  id       String   <span class="schema-type">@id @default(cuid())</span>
+  threadId String
+  role     String   <span class="schema-comment">// "user" | "assistant"</span>
+  content  String
+  sentAt   DateTime <span class="schema-type">@default(now())</span>
+  thread   <span class="schema-field">ChatThread</span> <span class="schema-type">@relation(...)</span>
+}</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Store every message in two Prisma tables: <code>ChatThread</code> (one per league per user) and <code>ChatMessage</code> (every turn). When a new message comes in, the API loads the last N messages from that thread and includes them in the GPT-4o request as conversation history. Chat feels continuous — you can close the app, come back a week later, and the AI still knows what you were talking about. This is how ChatGPT works.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want multi-turn conversation that feels natural</li>
+            <li>Users ask follow-up questions ("what about the year before?")</li>
+            <li>History browsing is a future feature you want to leave open</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Long threads get expensive — need a turn limit (last 10–20 turns)</li>
+            <li>Two new Prisma tables and a migration</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- OPTION B: Stateless (client sends history) -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Client-Owned History</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer"><div class="arch-box device">iOS App</div></div>
+          <div class="arch-label">stores full history locally</div>
+          <div class="arch-arrow">↓ sends entire history each request</div>
+          <div class="arch-layer"><div class="arch-box backend">Express API</div></div>
+          <div class="arch-label">stateless — never stores messages</div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer"><div class="arch-box database">GPT-4o</div></div>
+        </div>
+      </div>
+      <div class="option-summary">
+        The iOS app holds the full conversation in memory (and optionally persists it locally). Each API request includes the entire message history in the POST body. The Express API is completely stateless — it just passes history to GPT-4o and streams back a reply. Simple to build on the server side, but the API payload grows with every message. If the user deletes the app or switches devices, all history is gone.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Simplest possible API — no DB changes needed</li>
+            <li>Single device, single user, low message volume</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>History lost if app is deleted or user reinstalls</li>
+            <li>Large payloads — 20-turn history sent on every request</li>
+            <li>No server-side visibility into conversations</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- OPTION C: Redis session cache -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Redis Session Cache</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer"><div class="arch-box device">iOS App</div></div>
+          <div class="arch-arrow">↓ sends threadId + new message</div>
+          <div class="arch-layer"><div class="arch-box backend">Express API</div></div>
+          <div class="arch-arrow">↕ read/write recent turns</div>
+          <div class="arch-layer"><div class="arch-box cache">Redis (TTL 24h)</div></div>
+          <div class="arch-label">no permanent storage</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Use Redis (which you already run) to cache active conversation history with a time-to-live of 24 hours. The API reads recent turns from Redis, calls GPT-4o, appends the new exchange, and writes it back. After 24 hours of inactivity the conversation evaporates automatically. You get multi-turn memory within a session without adding Postgres tables, but nothing persists long-term.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want session-scoped memory without a DB migration</li>
+            <li>Redis is already in the stack (it is)</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>History evaporates after 24h — users lose context unexpectedly</li>
+            <li>Redis is not designed for durable storage — data can be lost on restart</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- OPTION D: No history (fresh each request) -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Stateless — No Memory</h2>
+      </div>
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer"><div class="arch-box device">iOS App</div></div>
+          <div class="arch-arrow">↓ sends one message at a time</div>
+          <div class="arch-layer"><div class="arch-box backend">Express API</div></div>
+          <div class="arch-arrow">↓ system prompt + single user message</div>
+          <div class="arch-layer"><div class="arch-box database">GPT-4o</div></div>
+          <div class="arch-label">every question is independent</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Every question is completely independent. The API sends only the system prompt, the league context, and the single user message — no prior conversation history. It's the simplest possible implementation, but it means the model has no memory at all. "What about the previous season?" makes no sense to it. This is more of a Q&A interface than a real chat.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Absolute simplest to build — no state management at all</li>
+            <li>Questions are always self-contained (rare in practice)</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>No follow-up questions — model can't reference prior answers</li>
+            <li>Feels broken compared to any chat product users have used</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">Option A: Persistent DB</th>
+            <th class="col-b">Option B: Client-Owned</th>
+            <th class="col-c">Option C: Redis Cache</th>
+            <th class="col-d">Option D: No Memory</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>History survives app reinstall</td>
+            <td class="col-recommended">Yes</td>
+            <td>No</td>
+            <td>No</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td>Multi-turn follow-ups</td>
+            <td class="col-recommended">Yes — full history</td>
+            <td>Yes — client sends all</td>
+            <td>Yes — within 24h</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>DB changes needed</td>
+            <td class="col-recommended">2 new Prisma tables</td>
+            <td>None</td>
+            <td>None</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>API payload size</td>
+            <td class="col-recommended">Small (just new message)</td>
+            <td>Grows with history</td>
+            <td>Small (just new message)</td>
+            <td>Minimal</td>
+          </tr>
+          <tr>
+            <td>Context window cost</td>
+            <td class="col-recommended">Controlled (last N turns)</td>
+            <td>Client decides</td>
+            <td>Controlled (TTL trims)</td>
+            <td>Lowest</td>
+          </tr>
+          <tr>
+            <td>History browsing (future)</td>
+            <td class="col-recommended">Built-in</td>
+            <td>Device-only</td>
+            <td>Not possible</td>
+            <td>Not possible</td>
+          </tr>
+          <tr>
+            <td>Implementation complexity</td>
+            <td class="col-recommended">Moderate</td>
+            <td>Low (server)</td>
+            <td>Low</td>
+            <td>Lowest</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option B but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-025 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

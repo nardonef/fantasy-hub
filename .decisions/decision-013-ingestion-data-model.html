@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 13: Ingestion Data Model — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .decision-number {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin-top: 0.25rem;
+    }
+
+    .category-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 0.5rem;
+    }
+
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+
+    .decision-description {
+      font-size: 1rem;
+      color: #475569;
+      margin-top: 0.75rem;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+
+    .instruction {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      display: inline-block;
+      border: 1px solid #bfdbfe;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto 3rem;
+    }
+
+    .option-card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+      border: 2px solid #e2e8f0;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .option-card:hover {
+      border-color: #6366f1;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.12);
+    }
+
+    .card-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .card-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .option-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+
+    .option-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .recommended-badge {
+      background: #f59e0b;
+      color: white;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .option-card.chosen {
+      border: 3px solid #059669;
+      box-shadow: 0 4px 20px rgba(5,150,105,0.15);
+    }
+
+    .option-card.chosen:hover { border-color: #059669; }
+
+    .card-badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .chosen-badge {
+      background: #059669;
+      color: white;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      display: none;
+    }
+
+    .option-card.chosen .chosen-badge { display: inline-block; }
+
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+
+    .visual-preview {
+      padding: 1.5rem;
+      background: #f8fafc;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+
+    .option-summary {
+      padding: 1rem 1.25rem;
+      font-size: 0.875rem;
+      color: #334155;
+      line-height: 1.65;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .verdict {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+
+    .pros h3, .cons h3 {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+
+    .verdict ul { list-style: none; padding: 0; }
+
+    .verdict li {
+      font-size: 0.8rem;
+      color: #475569;
+      line-height: 1.5;
+      padding: 0.15rem 0;
+      padding-left: 1rem;
+      position: relative;
+    }
+
+    .pros li::before { content: "\2713 "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+
+    .card-footer {
+      padding: 0.75rem 1.25rem;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .tell-claude {
+      font-size: 0.75rem;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      display: block;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    .comparison-section {
+      max-width: 1200px;
+      margin: 0 auto 3rem;
+    }
+
+    .comparison-section h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 1rem;
+    }
+
+    .comparison-table-wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      font-size: 0.85rem;
+    }
+
+    .comparison-table th {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-bottom: 2px solid #e2e8f0;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      background: white;
+    }
+
+    .comparison-table th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #f8fafc;
+      color: #64748b;
+    }
+
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+
+    .comparison-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+
+    .comparison-table td:first-child {
+      font-weight: 600;
+      color: #475569;
+      position: sticky;
+      left: 0;
+      background: #f8fafc;
+    }
+
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+
+    .page-footer {
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .page-footer p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin: 0.3rem 0;
+    }
+
+    .page-footer strong { color: #334155; }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      color: #6366f1;
+      text-decoration: none;
+      max-width: 1200px;
+    }
+
+    .back-link:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      .options-grid { grid-template-columns: 1fr; }
+      body { padding: 1rem; }
+    }
+
+    /* Schema diagram styles */
+    .schema-diagram {
+      width: 100%;
+      max-width: 340px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.65rem;
+    }
+    .schema-table {
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .schema-table-name {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 4px 10px;
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
+    .schema-table-name.accent { background: #7c3aed; }
+    .schema-table-name.green { background: #059669; }
+    .schema-table-name.blue { background: #0891b2; }
+    .schema-table-name.red { background: #dc2626; }
+    .schema-field {
+      padding: 2px 10px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #475569;
+      display: flex;
+      justify-content: space-between;
+    }
+    .schema-field:last-child { border-bottom: none; }
+    .schema-type { color: #94a3b8; }
+    .schema-arrow {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      padding: 2px 0;
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">&larr; All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 13 of 19</span>
+    <h1>Ingestion Data Model</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      Right now your Prisma schema has no concept of a "Player" -- players are just name strings on DraftPick and Transaction records. The Intelligence Platform needs to store signals from Reddit, Twitter, NFL stats, and consensus rankings, all tied to specific players. This decision is about how to structure those new tables: do you keep it simple with one big signals table, or normalize into separate tables per source type? The choice affects how easy it is to query across sources, how migrations work as you add new source types, and how the Player Resolution step (Phase 2) connects raw mentions to canonical player identities.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> &middot; <strong>"Option A but [change]"</strong> &middot; <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Single Unified Table -->
+    <article class="option-card option-a not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Single Signal Table</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="schema-diagram">
+          <div class="schema-table">
+            <div class="schema-table-name green">Player</div>
+            <div class="schema-field"><span>id</span><span class="schema-type">uuid PK</span></div>
+            <div class="schema-field"><span>fullName</span><span class="schema-type">string</span></div>
+            <div class="schema-field"><span>team</span><span class="schema-type">string?</span></div>
+            <div class="schema-field"><span>position</span><span class="schema-type">enum</span></div>
+            <div class="schema-field"><span>externalIds</span><span class="schema-type">json</span></div>
+          </div>
+          <div class="schema-arrow">&darr;</div>
+          <div class="schema-table">
+            <div class="schema-table-name accent">Signal</div>
+            <div class="schema-field"><span>id</span><span class="schema-type">uuid PK</span></div>
+            <div class="schema-field"><span>source</span><span class="schema-type">enum</span></div>
+            <div class="schema-field"><span>sourceType</span><span class="schema-type">enum</span></div>
+            <div class="schema-field"><span>playerNameRaw</span><span class="schema-type">string</span></div>
+            <div class="schema-field"><span>playerId</span><span class="schema-type">uuid? FK</span></div>
+            <div class="schema-field"><span>contentRaw</span><span class="schema-type">text</span></div>
+            <div class="schema-field"><span>sentiment</span><span class="schema-type">float?</span></div>
+            <div class="schema-field"><span>metadata</span><span class="schema-type">json</span></div>
+            <div class="schema-field"><span>week</span><span class="schema-type">int?</span></div>
+            <div class="schema-field"><span>season</span><span class="schema-type">int</span></div>
+            <div class="schema-field"><span>fetchedAt</span><span class="schema-type">datetime</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Exactly what you described in your build plan: one <code>Signal</code> table plus a new <code>Player</code> table. Every ingestion job writes to the same table, differentiated by <code>source</code> and <code>sourceType</code> enums. Source-specific data (like Reddit upvotes, tweet likes, or ranking position) goes into a flexible <code>metadata</code> JSON column. This is the simplest possible schema -- two new tables, one migration, done.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want to ship ingestion fast with minimal schema churn</li>
+            <li>Cross-source queries are common ("all signals for player X")</li>
+            <li>You're still figuring out what metadata matters per source</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>JSON metadata column is untyped -- no schema validation at DB level</li>
+            <li>As signal volume grows, one table could get very large</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Typed Signal Tables -->
+    <article class="option-card option-b chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Typed Signal Family</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="schema-diagram">
+          <div class="schema-table">
+            <div class="schema-table-name green">Player</div>
+            <div class="schema-field"><span>id</span><span class="schema-type">uuid PK</span></div>
+            <div class="schema-field"><span>fullName</span><span class="schema-type">string</span></div>
+            <div class="schema-field"><span>position, team...</span><span class="schema-type">typed</span></div>
+          </div>
+          <div class="schema-arrow">&darr; FK on all tables below</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+            <div class="schema-table">
+              <div class="schema-table-name accent">SocialMention</div>
+              <div class="schema-field"><span>source</span><span class="schema-type">enum</span></div>
+              <div class="schema-field"><span>content</span><span class="schema-type">text</span></div>
+              <div class="schema-field"><span>upvotes</span><span class="schema-type">int</span></div>
+              <div class="schema-field"><span>sentiment</span><span class="schema-type">float?</span></div>
+            </div>
+            <div class="schema-table">
+              <div class="schema-table-name blue">PlayerRanking</div>
+              <div class="schema-field"><span>platform</span><span class="schema-type">enum</span></div>
+              <div class="schema-field"><span>rank</span><span class="schema-type">int</span></div>
+              <div class="schema-field"><span>scoringFormat</span><span class="schema-type">enum</span></div>
+              <div class="schema-field"><span>tier</span><span class="schema-type">int?</span></div>
+            </div>
+            <div class="schema-table">
+              <div class="schema-table-name red">PlayerStat</div>
+              <div class="schema-field"><span>passingYards</span><span class="schema-type">int?</span></div>
+              <div class="schema-field"><span>rushingYards</span><span class="schema-type">int?</span></div>
+              <div class="schema-field"><span>receptions</span><span class="schema-type">int?</span></div>
+              <div class="schema-field"><span>fantasyPoints</span><span class="schema-type">float</span></div>
+            </div>
+            <div class="schema-table">
+              <div class="schema-table-name" style="background:#64748b">PlayerNameAlias</div>
+              <div class="schema-field"><span>alias</span><span class="schema-type">string</span></div>
+              <div class="schema-field"><span>source</span><span class="schema-type">enum</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Instead of one generic table, create separate tables for each signal type: <code>SocialMention</code> (Reddit + Twitter), <code>PlayerRanking</code> (FantasyPros, ESPN, Yahoo), <code>PlayerStat</code> (NFL weekly stats), and <code>PlayerNameAlias</code> (for fuzzy match resolution). Each table has typed columns specific to its domain -- no JSON metadata bag. All link back to the <code>Player</code> table via FK. This is my recommendation because it gives you type safety, better query performance (index on rank, week, etc.), and makes each ingestion job's schema explicit. The cost is more tables and slightly more migration work upfront.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You know the shape of each data source (you do -- the plan is detailed)</li>
+            <li>You want indexed queries like "rankings for player X, week 5, PPR format"</li>
+            <li>Type safety matters -- Prisma generates typed models per table</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>More tables = more migration steps when adding a new source type</li>
+            <li>Cross-source "unified feed" query requires JOINs or UNION</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Hybrid -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Hybrid Core + Flex</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="schema-diagram">
+          <div class="schema-table">
+            <div class="schema-table-name green">Player</div>
+            <div class="schema-field"><span>id, fullName, position...</span><span class="schema-type">typed</span></div>
+          </div>
+          <div class="schema-arrow">&darr;</div>
+          <div class="schema-table">
+            <div class="schema-table-name accent">Signal</div>
+            <div class="schema-field"><span>id</span><span class="schema-type">uuid PK</span></div>
+            <div class="schema-field"><span>source</span><span class="schema-type">enum</span></div>
+            <div class="schema-field"><span>content</span><span class="schema-type">text</span></div>
+            <div class="schema-field"><span>sentiment</span><span class="schema-type">float?</span></div>
+            <div class="schema-field"><span>week, season</span><span class="schema-type">int</span></div>
+          </div>
+          <div class="schema-arrow">&darr; one-to-one extensions</div>
+          <div style="display:flex;gap:4px">
+            <div class="schema-table" style="flex:1">
+              <div class="schema-table-name blue">RankingDetail</div>
+              <div class="schema-field"><span>rank, tier</span><span class="schema-type">int</span></div>
+            </div>
+            <div class="schema-table" style="flex:1">
+              <div class="schema-table-name red">StatDetail</div>
+              <div class="schema-field"><span>yards, tds</span><span class="schema-type">int</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        A middle ground: keep one <code>Signal</code> table for shared columns (source, player, content, sentiment, week), but add "extension" tables (<code>RankingDetail</code>, <code>StatDetail</code>) that link 1:1 to a Signal row when extra typed data is needed. Social mentions (Reddit, Twitter) just use the base Signal row. Rankings and stats get their own typed extension. This gives you a unified feed query on the base table, plus typed access when you drill into specifics.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want a unified feed query AND typed access for specific sources</li>
+            <li>New social sources (YouTube, TikTok) can be added with zero migration</li>
+            <li>The base table stays lean -- extensions are only joined when needed</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>1:1 extension pattern adds JOIN complexity for detail queries</li>
+            <li>Prisma doesn't have native "table inheritance" -- you'll manage the pattern manually</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Event Sourcing -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Event Log + Views</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="schema-diagram">
+          <div class="schema-table">
+            <div class="schema-table-name green">Player</div>
+            <div class="schema-field"><span>id, fullName, position...</span><span class="schema-type">typed</span></div>
+          </div>
+          <div class="schema-arrow">&darr;</div>
+          <div class="schema-table">
+            <div class="schema-table-name" style="background:#1e293b">RawSignalEvent</div>
+            <div class="schema-field"><span>id</span><span class="schema-type">uuid PK</span></div>
+            <div class="schema-field"><span>source</span><span class="schema-type">enum</span></div>
+            <div class="schema-field"><span>payload</span><span class="schema-type">jsonb</span></div>
+            <div class="schema-field"><span>playerNameRaw</span><span class="schema-type">string</span></div>
+            <div class="schema-field"><span>playerId</span><span class="schema-type">uuid? FK</span></div>
+            <div class="schema-field"><span>fetchedAt</span><span class="schema-type">datetime</span></div>
+          </div>
+          <div class="schema-arrow">&darr; materialized views (cron-refreshed)</div>
+          <div style="display:flex;gap:4px">
+            <div class="schema-table" style="flex:1">
+              <div class="schema-table-name accent">mv_player_feed</div>
+              <div class="schema-field"><span>denormalized</span><span class="schema-type">view</span></div>
+            </div>
+            <div class="schema-table" style="flex:1">
+              <div class="schema-table-name blue">mv_player_rank</div>
+              <div class="schema-field"><span>aggregated</span><span class="schema-type">view</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Store everything as raw events in a single append-only table with a <code>jsonb</code> payload column. Then create PostgreSQL materialized views that project the data into queryable shapes -- one view for the feed, one for rankings aggregation, one for player stats. The raw event log is your source of truth; the views are rebuilt on a schedule (or triggered after each ingestion run). This is the most flexible approach if you expect the data shape to evolve a lot, but it adds operational complexity with view refresh management.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Data shape is highly uncertain and you want to iterate without migrations</li>
+            <li>You want to replay or reprocess raw data (e.g., when LLM enrichment arrives)</li>
+            <li>Materialized views give you fast reads without denormalizing in app code</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Materialized view refresh adds operational complexity and latency</li>
+            <li>JSONB queries are slower than typed columns for filtering/indexing</li>
+            <li>Prisma has limited support for materialized views -- you'll write raw SQL</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a">A: Single Signal</th>
+            <th class="col-b col-recommended">B: Typed Family</th>
+            <th class="col-c">C: Hybrid</th>
+            <th class="col-d">D: Event Log</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>New tables</td>
+            <td>2 (Player, Signal)</td>
+            <td class="col-recommended">5 (Player, SocialMention, PlayerRanking, PlayerStat, PlayerNameAlias)</td>
+            <td>4+ (Player, Signal, extensions)</td>
+            <td>2 + materialized views</td>
+          </tr>
+          <tr>
+            <td>Type safety</td>
+            <td>Partial (JSON metadata untyped)</td>
+            <td class="col-recommended">Full -- every column typed, Prisma generates models</td>
+            <td>Mixed -- base is typed, extensions are typed</td>
+            <td>None on raw; views can be typed</td>
+          </tr>
+          <tr>
+            <td>Cross-source feed query</td>
+            <td>Trivial -- one table</td>
+            <td class="col-recommended">Requires UNION across tables</td>
+            <td>Easy -- query base Signal table</td>
+            <td>Easy via materialized view</td>
+          </tr>
+          <tr>
+            <td>Source-specific queries</td>
+            <td>Filter by enum + parse JSON</td>
+            <td class="col-recommended">Direct indexed queries per table</td>
+            <td>JOIN to extension table</td>
+            <td>Via materialized view</td>
+          </tr>
+          <tr>
+            <td>Adding new source types</td>
+            <td>Add enum value, maybe update JSON shape</td>
+            <td class="col-recommended">New migration + new table</td>
+            <td>Social: just enum. Structured: new extension table</td>
+            <td>No migration needed -- just new view</td>
+          </tr>
+          <tr>
+            <td>Prisma compatibility</td>
+            <td>Excellent</td>
+            <td class="col-recommended">Excellent</td>
+            <td>Good (manual 1:1 pattern)</td>
+            <td>Poor (raw SQL for views)</td>
+          </tr>
+          <tr>
+            <td>Query performance at scale</td>
+            <td>Degrades -- one big table</td>
+            <td class="col-recommended">Good -- smaller, indexed tables</td>
+            <td>Good -- base stays lean</td>
+            <td>Depends on view refresh frequency</td>
+          </tr>
+          <tr>
+            <td>Migration effort</td>
+            <td>Minimal</td>
+            <td class="col-recommended">Moderate</td>
+            <td>Moderate</td>
+            <td>Low initial, high ongoing</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-013 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

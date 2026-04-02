@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 6: AI/Chat Architecture — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; max-width: 1200px; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    .arch-diagram { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0.5rem; width: 100%; }
+    .arch-layer { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; width: 100%; }
+    .arch-box { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: center; min-width: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .arch-box.frontend { border-color: #7c3aed; color: #7c3aed; }
+    .arch-box.backend { border-color: #0891b2; color: #0891b2; }
+    .arch-box.database { border-color: #059669; color: #059669; }
+    .arch-box.service { border-color: #dc2626; color: #dc2626; }
+    .arch-box.infra { border-color: #64748b; color: #64748b; }
+    .arch-box.ai { border-color: #d97706; color: #d97706; }
+    .arch-arrow { font-size: 1rem; color: #94a3b8; text-align: center; }
+    .arch-note { font-size: 0.6rem; color: #94a3b8; text-align: center; font-style: italic; margin-top: 4px; }
+
+    .flow-container { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem; width: 100%; max-width: 280px; }
+    .flow-step { display: flex; align-items: center; gap: 10px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; font-size: 0.7rem; font-weight: 600; color: #334155; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .flow-step.highlight { border-color: #6366f1; background: #eff6ff; color: #1d4ed8; }
+    .flow-step-number { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; flex-shrink: 0; }
+    .flow-step.highlight .flow-step-number { background: #6366f1; color: white; }
+    .flow-step-label { flex: 1; }
+    .flow-down-arrow { font-size: 1rem; color: #94a3b8; padding: 2px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 6 of 12</span>
+    <h1>AI/Chat Architecture</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      This is the feature that makes Fantasy League Hub special: an AI assistant that actually understands your league's full history. "Who had the best draft in 2023?" "What's my all-time record against Mike?" "Generate a recap of last season." The challenge is context — a league with 10 years of history across 12 managers has thousands of matchups, transactions, and draft picks. You can't dump all of that into a single LLM prompt. The architecture needs to figure out what data is relevant to each question, retrieve it efficiently, and give the LLM enough context to answer accurately without hallucinating stats.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: RAG with pgvector -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">RAG + Tool Use (pgvector)</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">User asks: "Best draft in 2023?"</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">LLM decides: call get_draft_results(2023)</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">Tool queries Postgres for 2023 draft data</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">pgvector finds similar past discussions</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">LLM receives structured data + context</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">6</span>
+            <span class="flow-step-label">Generates answer with real stats cited</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Combine two powerful patterns: RAG (Retrieval-Augmented Generation) using pgvector embeddings in your existing Postgres database, and LLM tool use where the AI can call specific functions to query your data. In step 2, the LLM decides which tools to call — get_draft_results(), get_head_to_head(), get_standings() — based on the question. These tools run real Postgres queries and return structured data. pgvector (step 4) adds semantic search for fuzzier queries. The LLM gets real data, not hallucinated stats. I recommend this because tool use gives you precision (exact stats from your database) while RAG gives you flexibility (fuzzy/narrative queries), and pgvector lives in Postgres so there's no extra infrastructure.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Most accurate — LLM gets real data from your database via tools</li>
+            <li>pgvector in Postgres — no separate vector database needed</li>
+            <li>Handles both precise stats and narrative/fuzzy queries</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Tool definitions need maintenance as your data model evolves</li>
+            <li>Multi-step tool calls add latency (2-4 seconds per query)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Pre-computed Context Windows -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Pre-Computed League Summaries</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box ai">After each sync...</div>
+          </div>
+          <div class="arch-arrow">↓ generate</div>
+          <div class="arch-layer">
+            <div class="arch-box database">League Summary Doc</div>
+            <div class="arch-box database">Season Summaries</div>
+            <div class="arch-box database">Manager Profiles</div>
+          </div>
+          <div class="arch-arrow">↓ when user asks a question</div>
+          <div class="arch-layer">
+            <div class="arch-box ai">Claude / GPT</div>
+          </div>
+          <div class="arch-arrow">↕ system prompt includes</div>
+          <div class="arch-layer">
+            <div class="arch-box infra">League summary + relevant season docs</div>
+          </div>
+          <div class="arch-note">Context is pre-built, not fetched on each query</div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        After each data sync, pre-compute condensed text summaries of your league data: a league overview doc (champions, records, rivalries), per-season summaries, and per-manager profiles. When a user asks a question, stuff the relevant pre-computed summaries into the system prompt — no tool calls needed, no vector search. The LLM just reads the summaries and answers. This is simpler to build and faster at response time (no tool call round-trips). The trade-off is that the summaries may not contain the specific detail the user is asking about, and updating them after every sync costs LLM tokens.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Simplest architecture — no tools, no vector DB, just context stuffing</li>
+            <li>Fastest response time — no round-trips for data retrieval</li>
+            <li>Pre-computed summaries can power non-chat features too (recaps)</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Summaries may miss the specific detail a user asks about</li>
+            <li>Generating summaries after every sync costs LLM tokens</li>
+            <li>Harder to answer precise stat queries ("exact score in Week 7 2021")</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Full Tool Use (No RAG) -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Pure Tool Use (SQL Agent)</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="flow-container">
+          <div class="flow-step">
+            <span class="flow-step-number">1</span>
+            <span class="flow-step-label">User: "Longest win streak ever?"</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">2</span>
+            <span class="flow-step-label">LLM generates SQL query</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">3</span>
+            <span class="flow-step-label">Execute against Postgres (read-only)</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step">
+            <span class="flow-step-number">4</span>
+            <span class="flow-step-label">Return query results to LLM</span>
+          </div>
+          <div class="flow-down-arrow">↓</div>
+          <div class="flow-step highlight">
+            <span class="flow-step-number">5</span>
+            <span class="flow-step-label">LLM formats into natural language</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Give the LLM your database schema and let it write SQL queries directly. In step 2, the AI generates a SQL query based on the user's question and your schema. The query runs against a read-only Postgres replica, and the results come back as data the LLM formats into a natural language answer. This is the most flexible approach — the AI can answer any question that's answerable from your data. No pre-built tools, no embeddings, no summaries. The risk is that LLM-generated SQL can be wrong, slow, or occasionally dangerous (even with read-only access, a bad query can overload the DB).
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Most flexible — can answer any question from the data</li>
+            <li>No tool definitions to maintain — schema is the interface</li>
+            <li>Can handle complex, multi-join analytical queries</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>LLM-generated SQL can be wrong or inefficient</li>
+            <li>Bad queries can overload the database</li>
+            <li>Needs guardrails — query timeout, row limits, read-only access</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Hybrid with Narrative Engine -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Hybrid: Tools + Summaries + Narratives</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <div class="arch-box ai">Query Router</div>
+          </div>
+          <div class="arch-arrow">↓ classifies question type</div>
+          <div class="arch-layer">
+            <div class="arch-box backend">Stats Query?</div>
+            <div class="arch-box backend">Narrative?</div>
+            <div class="arch-box backend">Comparison?</div>
+          </div>
+          <div class="arch-arrow">↓ routes to best strategy</div>
+          <div class="arch-layer">
+            <div class="arch-box service">Tool Use</div>
+            <div class="arch-box service">Pre-computed Docs</div>
+            <div class="arch-box service">pgvector Search</div>
+          </div>
+          <div class="arch-arrow">↓ assembles context</div>
+          <div class="arch-layer">
+            <div class="arch-box ai">LLM generates response</div>
+          </div>
+          <div class="arch-note">Smart routing picks the best retrieval strategy per question</div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Build all three retrieval strategies (tool use, pre-computed summaries, vector search) and add a routing layer that picks the best one for each question. "What was my exact score in Week 3?" routes to tool use. "Give me a recap of last season" routes to pre-computed summaries. "Who reminds you of a 2019-era manager?" routes to semantic search. A narrative engine also runs after each season/week to generate storylines, rivalry updates, and power rankings automatically. This is the most capable approach but also the most complex — it's what you'd build for a polished v2 or v3, not v1.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Best possible answer quality — right strategy for each question</li>
+            <li>Automated narratives (recaps, storylines) are a killer feature</li>
+            <li>Can evolve each strategy independently</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Most complex — three retrieval systems + a router</li>
+            <li>Router itself needs to be accurate or answers degrade</li>
+            <li>Significantly more LLM cost (routing + retrieval + generation)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <!-- COMPARISON TABLE -->
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: RAG + Tool Use</th>
+            <th class="col-b">B: Pre-Computed Summaries</th>
+            <th class="col-c">C: Pure SQL Agent</th>
+            <th class="col-d">D: Hybrid Router</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Answer Accuracy (stats)</td>
+            <td class="col-recommended">High — tools fetch real data</td>
+            <td>Medium — depends on summary detail</td>
+            <td>High — direct SQL, but can hallucinate queries</td>
+            <td>Highest — routes to best strategy</td>
+          </tr>
+          <tr>
+            <td>Narrative Quality</td>
+            <td class="col-recommended">Good — context from RAG</td>
+            <td>Great — pre-built narrative summaries</td>
+            <td>Weak — raw data, no narrative context</td>
+            <td>Best — dedicated narrative engine</td>
+          </tr>
+          <tr>
+            <td>Response Latency</td>
+            <td class="col-recommended">2-4s (tool call round-trips)</td>
+            <td>1-2s (context already loaded)</td>
+            <td>2-5s (SQL generation + execution)</td>
+            <td>2-5s (routing + retrieval + generation)</td>
+          </tr>
+          <tr>
+            <td>Build Complexity</td>
+            <td class="col-recommended">Medium — tools + pgvector setup</td>
+            <td>Low — summary generation + context stuffing</td>
+            <td>Medium — SQL generation + guardrails</td>
+            <td>High — all three systems + router</td>
+          </tr>
+          <tr>
+            <td>LLM Cost per Query</td>
+            <td class="col-recommended">Medium — tool calls + final response</td>
+            <td>Low — one call with context</td>
+            <td>Medium — SQL gen + response gen</td>
+            <td>Higher — routing + retrieval + response</td>
+          </tr>
+          <tr>
+            <td>Handles "Exact Score Week 7"</td>
+            <td class="col-recommended">Yes — tool fetches exact data</td>
+            <td>Only if summary includes it</td>
+            <td>Yes — SQL can find any row</td>
+            <td>Yes — routes to tool/SQL</td>
+          </tr>
+          <tr>
+            <td>Handles "Season Recap"</td>
+            <td class="col-recommended">Good — RAG finds relevant events</td>
+            <td>Best — pre-written summaries</td>
+            <td>Weak — returns raw numbers</td>
+            <td>Best — routes to narratives</td>
+          </tr>
+          <tr>
+            <td>Extra Infrastructure</td>
+            <td class="col-recommended">None — pgvector in existing Postgres</td>
+            <td>None — summaries in Postgres</td>
+            <td>Read-only DB replica recommended</td>
+            <td>Multiple retrieval systems</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-001 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

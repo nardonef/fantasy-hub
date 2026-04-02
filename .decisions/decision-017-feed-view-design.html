@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 17: Feed View Design — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.visual { background: #fce7f3; color: #be185d; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "\2713 "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">&larr; All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 17 of 19</span>
+    <h1>Feed View Design</h1>
+    <span class="category-badge visual">Visual</span>
+    <p class="decision-description">
+      The Feed is the root view of your new Intel tab -- it's where users land when they tap "Intel" in the tab bar. It needs to blend content from multiple sources (Reddit posts, Bluesky mentions, rankings changes, stat lines) into a cohesive, filterable stream. The design challenge: each source type has a different shape (a Reddit post with upvotes vs. a ranking change vs. a stat line), but they need to feel unified. You also need filtering -- by team, by player, by source -- without overwhelming the screen with controls.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> &middot; <strong>"Option A but [change]"</strong> &middot; <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: Unified Card Stream -->
+    <article class="option-card option-a">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Unified Card Stream</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div style="width:100%;max-width:300px;background:#1A1A1A;border-radius:12px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif">
+          <!-- Filter chips -->
+          <div style="padding:10px 12px 6px;display:flex;gap:6px;overflow-x:auto">
+            <div style="background:#C9A96E;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#1A1A1A;font-weight:700;white-space:nowrap">My Team</div>
+            <div style="background:#2a2a2a;border:1px solid #444;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#999;font-weight:600;white-space:nowrap">All Players</div>
+            <div style="background:#2a2a2a;border:1px solid #444;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#999;font-weight:600;white-space:nowrap">Waivers</div>
+          </div>
+          <!-- Reddit card -->
+          <div style="margin:6px 12px;background:#222;border-radius:10px;padding:10px 12px;border-left:3px solid #FF4500">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <div style="width:16px;height:16px;background:#FF4500;border-radius:4px;font-size:0.5rem;color:white;display:flex;align-items:center;justify-content:center;font-weight:700">R</div>
+              <span style="font-size:0.5rem;color:#888">r/fantasyfootball &middot; 2h ago</span>
+            </div>
+            <div style="font-size:0.65rem;font-weight:600;color:#E8E2D6;line-height:1.4">"Mahomes looking sharp in OTAs -- beat reporter says arm strength is back to 2022 levels"</div>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <span style="font-size:0.5rem;color:#C9A96E;font-weight:600">Patrick Mahomes</span>
+              <span style="font-size:0.5rem;color:#666">&uarr; 847</span>
+              <span style="font-size:0.5rem;color:#666">124 comments</span>
+            </div>
+          </div>
+          <!-- Ranking card -->
+          <div style="margin:6px 12px;background:#222;border-radius:10px;padding:10px 12px;border-left:3px solid #059669">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <div style="width:16px;height:16px;background:#059669;border-radius:4px;font-size:0.5rem;color:white;display:flex;align-items:center;justify-content:center;font-weight:700">FP</div>
+              <span style="font-size:0.5rem;color:#888">FantasyPros ECR &middot; 6h ago</span>
+            </div>
+            <div style="font-size:0.65rem;font-weight:600;color:#E8E2D6">Amon-Ra St. Brown</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+              <span style="font-size:0.6rem;color:#4ADE80;font-weight:700">&uarr; 3</span>
+              <span style="font-size:0.55rem;color:#999">WR5 &rarr; WR2 (PPR)</span>
+            </div>
+          </div>
+          <!-- Bluesky card -->
+          <div style="margin:6px 12px 12px;background:#222;border-radius:10px;padding:10px 12px;border-left:3px solid #0085FF">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <div style="width:16px;height:16px;background:#0085FF;border-radius:4px;font-size:0.5rem;color:white;display:flex;align-items:center;justify-content:center;font-weight:700">B</div>
+              <span style="font-size:0.5rem;color:#888">@matthewberry.bsky &middot; 4h ago</span>
+            </div>
+            <div style="font-size:0.65rem;font-weight:600;color:#E8E2D6;line-height:1.4">"Don't sleep on Bijan Robinson's pass-catching upside. ATL scheming more screens for him this year."</div>
+            <div style="margin-top:6px"><span style="font-size:0.5rem;color:#C9A96E;font-weight:600">Bijan Robinson</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        A single scrollable list of cards, each with a colored left border indicating the source (Reddit=orange, Bluesky=blue, Rankings=green, Stats=navy). All cards share the same basic structure: source icon + timestamp at top, content in the middle, player name + metadata at bottom. Filter chips at the top let you switch between "My Team", "All Players", "Waivers", or tap a specific player. This is the most straightforward design -- it looks like a social feed you're already used to, but every card is relevant to fantasy. I recommend this because it's familiar, scannable, and the source colors make it easy to see the mix at a glance.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Familiar social feed pattern -- no learning curve</li>
+            <li>Source color coding makes the feed scannable at a glance</li>
+            <li>Simple filter chips handle team/player/source filtering</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>All cards same size -- ranking changes don't need as much space as Reddit posts</li>
+            <li>Long Reddit excerpts could dominate the feed visually</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Sectioned by Source -->
+    <article class="option-card option-b">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Source Lanes</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div style="width:100%;max-width:300px;background:#1A1A1A;border-radius:12px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif">
+          <div style="padding:10px 12px 6px;display:flex;gap:6px">
+            <div style="background:#C9A96E;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#1A1A1A;font-weight:700">All</div>
+            <div style="background:#FF450033;border:1px solid #FF4500;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#FF4500;font-weight:600">Reddit</div>
+            <div style="background:#0085FF33;border:1px solid #0085FF;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#0085FF;font-weight:600">Bluesky</div>
+            <div style="background:#05966933;border:1px solid #059669;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#059669;font-weight:600">Ranks</div>
+          </div>
+          <!-- Section header -->
+          <div style="padding:8px 12px 4px;font-size:0.55rem;font-weight:700;color:#FF4500;text-transform:uppercase;letter-spacing:0.05em">Reddit Buzz</div>
+          <div style="margin:0 12px 8px;background:#222;border-radius:8px;padding:8px 10px">
+            <div style="font-size:0.6rem;color:#E8E2D6;font-weight:600;line-height:1.4">"Mahomes looking sharp in OTAs..."</div>
+            <div style="font-size:0.45rem;color:#888;margin-top:3px">&uarr; 847 &middot; 2h ago</div>
+          </div>
+          <!-- Section header -->
+          <div style="padding:4px 12px;font-size:0.55rem;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.05em">Ranking Moves</div>
+          <div style="margin:0 12px 8px;display:flex;gap:6px">
+            <div style="flex:1;background:#222;border-radius:8px;padding:6px 8px;text-align:center">
+              <div style="font-size:0.6rem;font-weight:700;color:#4ADE80">&uarr;3</div>
+              <div style="font-size:0.5rem;color:#E8E2D6;font-weight:600">St. Brown</div>
+              <div style="font-size:0.45rem;color:#888">WR2</div>
+            </div>
+            <div style="flex:1;background:#222;border-radius:8px;padding:6px 8px;text-align:center">
+              <div style="font-size:0.6rem;font-weight:700;color:#F87171">&darr;5</div>
+              <div style="font-size:0.5rem;color:#E8E2D6;font-weight:600">Kelce</div>
+              <div style="font-size:0.45rem;color:#888">TE3</div>
+            </div>
+            <div style="flex:1;background:#222;border-radius:8px;padding:6px 8px;text-align:center">
+              <div style="font-size:0.6rem;font-weight:700;color:#4ADE80">&uarr;7</div>
+              <div style="font-size:0.5rem;color:#E8E2D6;font-weight:600">Addison</div>
+              <div style="font-size:0.45rem;color:#888">WR8</div>
+            </div>
+          </div>
+          <div style="padding:4px 12px 12px;font-size:0.55rem;font-weight:700;color:#0085FF;text-transform:uppercase;letter-spacing:0.05em">Expert Takes</div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Instead of mixing all sources into one stream, group them into visual "lanes" -- Reddit Buzz at the top, Ranking Moves in the middle (as a compact horizontal scroll), Expert Takes (Bluesky) below, and Stats at the bottom. Each section has its own visual treatment optimized for its data shape. Filter tabs at the top let you isolate one source. This gives each data type the layout it deserves -- rankings look like a leaderboard, social posts look like a feed, stats look like a table.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Each source type gets a layout optimized for its data shape</li>
+            <li>Rankings as compact cards are more scannable than full-width cards</li>
+            <li>Users who care about one source type can find it instantly</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Sections can feel disconnected -- you lose the "everything about player X" view</li>
+            <li>More complex to build -- each section needs its own layout</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Player-Grouped -->
+    <article class="option-card option-c">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Player-Grouped Feed</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div style="width:100%;max-width:300px;background:#1A1A1A;border-radius:12px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif">
+          <div style="padding:10px 12px 6px;display:flex;gap:6px">
+            <div style="background:#C9A96E;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#1A1A1A;font-weight:700">My Team</div>
+            <div style="background:#2a2a2a;border:1px solid #444;border-radius:20px;padding:4px 12px;font-size:0.55rem;color:#999;font-weight:600">All</div>
+          </div>
+          <!-- Player cluster -->
+          <div style="margin:6px 12px;background:#222;border-radius:10px;overflow:hidden">
+            <div style="padding:8px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #333">
+              <div>
+                <span style="font-size:0.7rem;font-weight:700;color:#E8E2D6">Patrick Mahomes</span>
+                <span style="font-size:0.5rem;color:#dc2626;margin-left:4px;font-weight:600">QB</span>
+              </div>
+              <div style="display:flex;gap:3px">
+                <div style="width:8px;height:8px;background:#FF4500;border-radius:2px"></div>
+                <div style="width:8px;height:8px;background:#0085FF;border-radius:2px"></div>
+                <div style="width:8px;height:8px;background:#059669;border-radius:2px"></div>
+              </div>
+            </div>
+            <div style="padding:6px 10px;font-size:0.55rem;color:#ccc;line-height:1.4;border-bottom:1px solid #2a2a2a">"Looking sharp in OTAs..." <span style="color:#888">&middot; Reddit &middot; 2h</span></div>
+            <div style="padding:6px 10px;font-size:0.55rem;color:#ccc;display:flex;justify-content:space-between"><span>ECR: QB1 (unchanged)</span><span style="color:#888">6h</span></div>
+            <div style="padding:6px 10px;font-size:0.55rem;color:#C9A96E;font-weight:600">3 signals &rarr;</div>
+          </div>
+          <!-- Another player -->
+          <div style="margin:6px 12px 12px;background:#222;border-radius:10px;overflow:hidden">
+            <div style="padding:8px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #333">
+              <div>
+                <span style="font-size:0.7rem;font-weight:700;color:#E8E2D6">Bijan Robinson</span>
+                <span style="font-size:0.5rem;color:#0891b2;margin-left:4px;font-weight:600">RB</span>
+              </div>
+              <div style="display:flex;gap:3px">
+                <div style="width:8px;height:8px;background:#0085FF;border-radius:2px"></div>
+              </div>
+            </div>
+            <div style="padding:6px 10px;font-size:0.55rem;color:#ccc;line-height:1.4">"Pass-catching upside..." <span style="color:#888">&middot; Bluesky &middot; 4h</span></div>
+            <div style="padding:6px 10px;font-size:0.55rem;color:#C9A96E;font-weight:600">1 signal &rarr;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Group all signals by player, not by time or source. Each player with recent activity gets a card showing all their signals in a compact stack -- the latest Reddit mention, current ranking, recent stat line, all in one place. Small colored dots indicate which sources have data. Tapping the card opens the full Player Detail view. This is the most "intelligence dashboard" approach -- you see everything about each player at once instead of scrolling through a mixed timeline.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Users care about players, not sources -- everything about a player in one place</li>
+            <li>Natural entry point to Player Detail view (tap to expand)</li>
+            <li>Signal density indicators help prioritize which players to investigate</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Loses the "what's new" chronological feel of a traditional feed</li>
+            <li>Players with many signals get long cards; single-signal players feel sparse</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Two-Panel Split -->
+    <article class="option-card option-d">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Ticker + Detail</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div style="width:100%;max-width:300px;background:#1A1A1A;border-radius:12px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif">
+          <!-- Horizontal ticker -->
+          <div style="padding:8px 12px;background:#111;border-bottom:1px solid #333">
+            <div style="font-size:0.45rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Trending Now</div>
+            <div style="display:flex;gap:6px;overflow:hidden">
+              <div style="background:#C9A96E22;border:1px solid #C9A96E44;border-radius:6px;padding:3px 8px;white-space:nowrap">
+                <span style="font-size:0.5rem;font-weight:700;color:#C9A96E">Mahomes</span>
+                <span style="font-size:0.45rem;color:#4ADE80">&uarr;5 signals</span>
+              </div>
+              <div style="background:#C9A96E22;border:1px solid #C9A96E44;border-radius:6px;padding:3px 8px;white-space:nowrap">
+                <span style="font-size:0.5rem;font-weight:700;color:#C9A96E">St. Brown</span>
+                <span style="font-size:0.45rem;color:#4ADE80">&uarr;3 signals</span>
+              </div>
+              <div style="background:#C9A96E22;border:1px solid #C9A96E44;border-radius:6px;padding:3px 8px;white-space:nowrap">
+                <span style="font-size:0.5rem;font-weight:700;color:#C9A96E">Robinson</span>
+                <span style="font-size:0.45rem;color:#4ADE80">&uarr;2</span>
+              </div>
+            </div>
+          </div>
+          <!-- Main feed below -->
+          <div style="padding:8px 12px">
+            <div style="background:#222;border-radius:8px;padding:8px 10px;margin-bottom:6px;border-left:3px solid #FF4500">
+              <div style="font-size:0.6rem;font-weight:600;color:#E8E2D6;line-height:1.4">"Mahomes looking sharp in OTAs..."</div>
+              <div style="font-size:0.45rem;color:#888;margin-top:3px">r/fantasyfootball &middot; 2h &middot; &uarr;847</div>
+            </div>
+            <div style="background:#222;border-radius:8px;padding:8px 10px;border-left:3px solid #059669">
+              <div style="font-size:0.6rem;font-weight:600;color:#E8E2D6">St. Brown &uarr;3 to WR2</div>
+              <div style="font-size:0.45rem;color:#888;margin-top:3px">FantasyPros ECR &middot; 6h</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        A horizontal "trending players" ticker at the top (think ESPN bottom line, but for your roster) shows which players have the most signal activity. Below it, a chronological card stream shows the actual content. Tapping a player in the ticker filters the stream to that player. This gives you both a "what's hot" overview and a deep-dive feed in one screen. The broadcast ticker ties into your "Broadcast Dark" visual identity.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Ticker gives instant "what's hot" visibility without scrolling</li>
+            <li>Broadcast aesthetic aligns perfectly with your design system</li>
+            <li>Ticker-to-filter is a natural interaction pattern</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Ticker takes vertical space on an already dense screen</li>
+            <li>Two scrollable regions (horizontal ticker + vertical feed) can feel fiddly</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Unified Stream</th>
+            <th class="col-b">B: Source Lanes</th>
+            <th class="col-c">C: Player-Grouped</th>
+            <th class="col-d">D: Ticker + Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Primary organization</td>
+            <td class="col-recommended">Chronological (mixed sources)</td>
+            <td>By source type</td>
+            <td>By player</td>
+            <td>Trending + chronological</td>
+          </tr>
+          <tr>
+            <td>Scan speed</td>
+            <td class="col-recommended">Fast -- scroll and skim</td>
+            <td>Medium -- jump between sections</td>
+            <td>Fast for specific players</td>
+            <td>Fast -- ticker gives instant overview</td>
+          </tr>
+          <tr>
+            <td>Filtering UX</td>
+            <td class="col-recommended">Chip bar (team/player/source)</td>
+            <td>Tab bar by source</td>
+            <td>Chip bar (team filter)</td>
+            <td>Ticker tap to filter</td>
+          </tr>
+          <tr>
+            <td>Build complexity</td>
+            <td class="col-recommended">Low -- one card type, one list</td>
+            <td>Medium -- multiple section layouts</td>
+            <td>Medium -- grouping + aggregation</td>
+            <td>Medium -- ticker + feed coordination</td>
+          </tr>
+          <tr>
+            <td>Design system fit</td>
+            <td class="col-recommended">Good -- cards match existing analytics style</td>
+            <td>Good -- sections match analytics categories</td>
+            <td>Good -- player cards match manager profiles</td>
+            <td>Great -- ticker is very "broadcast"</td>
+          </tr>
+          <tr>
+            <td>Path to Player Detail</td>
+            <td class="col-recommended">Tap player name on any card</td>
+            <td>Tap player name in any section</td>
+            <td>Tap card to expand</td>
+            <td>Tap ticker or card</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-016 I want Option A instead"</strong></p>
+  </div>
+
+</body>
+</html>

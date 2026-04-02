@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 14: Data Source APIs — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.technical { background: #ede9fe; color: #6d28d9; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 200px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "\2713 "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    /* Source stack visual */
+    .source-stack { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 6px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.65rem; }
+    .source-row { display: flex; align-items: center; gap: 8px; background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; }
+    .source-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: white; flex-shrink: 0; }
+    .source-info { flex: 1; }
+    .source-name { font-weight: 700; color: #0f172a; font-size: 0.7rem; }
+    .source-detail { color: #94a3b8; font-size: 0.6rem; }
+    .source-cost { font-weight: 700; font-size: 0.65rem; white-space: nowrap; }
+    .cost-free { color: #059669; }
+    .cost-paid { color: #dc2626; }
+    .cost-cheap { color: #d97706; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">&larr; All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 14 of 19</span>
+    <h1>Data Source APIs</h1>
+    <span class="category-badge technical">Technical</span>
+    <p class="decision-description">
+      You need four ingestion jobs pulling from Reddit, Twitter/X, NFL stats, and consensus rankings. But the API landscape for each is messy: Reddit's official API now has rate limits and costs, Twitter/X's API is expensive, NFL stats sources range from free-but-fragile to paid-and-reliable, and rankings may require scraping. This decision is about picking a concrete API stack that balances cost, reliability, and data quality. Your constraint is "cost-conscious" so we want to minimize paid API commitments early.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option B"</strong> &middot; <strong>"Option A but [change]"</strong> &middot; <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+    <!-- Option A: All Free / Public -->
+    <!-- CUSTOM CHOICE -->
+    <article class="option-card option-a chosen" style="grid-column: 1 / -1;">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label" style="color: #059669;">Custom Choice</span>
+          <div class="card-badges">
+            <span class="chosen-badge" style="display:inline-block">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Free &amp; Documented</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="source-stack" style="max-width:400px">
+          <div class="source-row">
+            <div class="source-icon" style="background:#FF4500">R</div>
+            <div class="source-info">
+              <div class="source-name">Reddit Official API</div>
+              <div class="source-detail">OAuth app, 100 req/min free tier -- documented &amp; stable</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#0085FF">B</div>
+            <div class="source-info">
+              <div class="source-name">Bluesky AT Protocol</div>
+              <div class="source-detail">Free open API -- partial NFL analyst coverage as Twitter alternative</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#1DA1F2">X</div>
+            <div class="source-info">
+              <div class="source-name">Nitter / RSS Bridges</div>
+              <div class="source-detail">Best-effort Twitter scraping -- fallback if Bluesky coverage gaps</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#013369">N</div>
+            <div class="source-info">
+              <div class="source-name">SportsDataIO Free Tier</div>
+              <div class="source-detail">1,000 calls/month, documented weekly stats API</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#059669">F</div>
+            <div class="source-info">
+              <div class="source-name">FantasyPros Scraping</div>
+              <div class="source-detail">HTML scrape of public consensus rankings page</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        A curated free stack that prioritizes documented APIs where available and falls back to scraping only where necessary. Reddit uses the official OAuth API (free tier, 100 req/min -- more than enough for twice-daily cron). For expert/social signals, Bluesky's AT Protocol is the primary source (free, open, growing NFL analyst community), with Nitter/RSS bridges as a best-effort supplemental Twitter source. NFL stats come from SportsDataIO's free tier (1,000 calls/month, documented endpoints). FantasyPros rankings get scraped from their public pages -- the one scraping dependency, but consensus rankings pages are structurally stable. Total cost: $0/month. Two documented APIs (Reddit, SportsDataIO), one open protocol (Bluesky), and two best-effort scrapers (Nitter, FantasyPros).
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Zero cost with documented APIs where they matter most (Reddit, stats)</li>
+            <li>Bluesky + Nitter together cover more expert signals than either alone</li>
+            <li>SportsDataIO free tier is stable, documented, and sufficient for weekly pulls</li>
+            <li>FantasyPros scraping is a proven pattern -- rankings pages rarely change structure</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Nitter instances can be unreliable -- treat as supplemental, not primary</li>
+            <li>Bluesky NFL analyst coverage is growing but not yet comprehensive</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Custom choice -- mix of Options A, B, and C</code>
+      </div>
+    </article>
+
+    <!-- Original options below, all not-chosen -->
+
+    <article class="option-card option-a not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Free Stack</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="source-stack">
+          <div class="source-row">
+            <div class="source-icon" style="background:#FF4500">R</div>
+            <div class="source-info">
+              <div class="source-name">Reddit JSON API</div>
+              <div class="source-detail">Append .json to any URL, no auth needed</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#1DA1F2">X</div>
+            <div class="source-info">
+              <div class="source-name">Nitter / RSS Bridges</div>
+              <div class="source-detail">Self-hosted or public instances, no API key</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#013369">N</div>
+            <div class="source-info">
+              <div class="source-name">ESPN Hidden API</div>
+              <div class="source-detail">Undocumented public endpoints for player stats</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#059669">F</div>
+            <div class="source-info">
+              <div class="source-name">FantasyPros Scraping</div>
+              <div class="source-detail">HTML scrape of public consensus rankings</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        All free, no API keys required. Reddit's .json endpoint gives you thread data without auth. Nitter instances or RSS bridges pull tweets without the X API. ESPN's undocumented API serves player stats as JSON. FantasyPros rankings get scraped from their public pages. This is the cheapest path and perfectly fine for twice-daily cron jobs. I recommend this because it matches your "cost-conscious" constraint and gives you all four data sources immediately. The trade-off is fragility -- undocumented APIs can change without notice.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Zero cost is a hard constraint during build-out</li>
+            <li>Twice-daily cron is low enough volume to avoid rate limits</li>
+            <li>You can tolerate occasional breakage and fix scraping logic</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Nitter instances are unreliable -- many shut down or go offline</li>
+            <li>ESPN hidden API could change any time with no deprecation notice</li>
+            <li>FantasyPros may block scrapers or change HTML structure</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Reddit Official + Paid Stats -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Stable Core</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="source-stack">
+          <div class="source-row">
+            <div class="source-icon" style="background:#FF4500">R</div>
+            <div class="source-info">
+              <div class="source-name">Reddit Official API</div>
+              <div class="source-detail">OAuth app, 100 req/min free tier</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#1DA1F2">X</div>
+            <div class="source-info">
+              <div class="source-name">Skip Twitter (Phase 5)</div>
+              <div class="source-detail">Defer until LLM enrichment phase</div>
+            </div>
+            <span class="source-cost cost-free">--</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#013369">N</div>
+            <div class="source-info">
+              <div class="source-name">SportsDataIO Free Tier</div>
+              <div class="source-detail">1,000 calls/month, weekly stats API</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#059669">F</div>
+            <div class="source-info">
+              <div class="source-name">FantasyPros API</div>
+              <div class="source-detail">Paid API with structured JSON rankings</div>
+            </div>
+            <span class="source-cost cost-paid">~$30/mo</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Use official APIs where they exist and are affordable. Reddit's official API is free for personal-use apps under 100 requests/minute (plenty for twice-daily cron). Skip Twitter entirely for now -- it's the most expensive and least reliable source. Use SportsDataIO's free tier for NFL stats (1,000 calls/month covers a full season easily). Pay for FantasyPros' API to get structured rankings data instead of fragile scraping. This gives you 3 of 4 sources with stable, documented APIs.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>You want documented, stable APIs that won't break randomly</li>
+            <li>Skipping Twitter saves $100+/month and simplifies Phase 1</li>
+            <li>SportsDataIO free tier is enough for weekly stats at twice-daily pulls</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Missing Twitter means no beat reporter signals until Phase 5</li>
+            <li>FantasyPros API cost adds up over time (~$360/year)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Reddit + Bluesky + Free Stats -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Bluesky Pivot</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="source-stack">
+          <div class="source-row">
+            <div class="source-icon" style="background:#FF4500">R</div>
+            <div class="source-info">
+              <div class="source-name">Reddit Official API</div>
+              <div class="source-detail">OAuth app, free tier</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#0085FF">B</div>
+            <div class="source-info">
+              <div class="source-name">Bluesky AT Protocol</div>
+              <div class="source-detail">Free, open API -- many NFL analysts active</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#013369">N</div>
+            <div class="source-info">
+              <div class="source-name">ESPN Hidden API</div>
+              <div class="source-detail">Undocumented but reliable for basic stats</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#059669">F</div>
+            <div class="source-info">
+              <div class="source-name">FantasyPros Scraping</div>
+              <div class="source-detail">HTML scrape with fallback parsing</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Replace Twitter with Bluesky. The AT Protocol is completely free, open, and has a real API -- no rate limit games, no $100/month fees. Many NFL beat reporters and fantasy analysts have moved to Bluesky, especially since 2025. You get the "expert signal" your build plan wants without the X API cost. Reddit uses the official API, ESPN's hidden endpoints cover stats, and FantasyPros gets scraped. All four sources, zero cost.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Bluesky's NFL analyst community has enough coverage for your needs</li>
+            <li>Zero cost across all 4 sources is appealing</li>
+            <li>AT Protocol's open API is a better long-term bet than X</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Bluesky has fewer NFL analysts than X -- coverage gaps are likely</li>
+            <li>ESPN hidden API + FantasyPros scraping are both fragile</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Premium All-In -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Premium Pipeline</h2>
+      </div>
+
+      <div class="visual-preview">
+        <div class="source-stack">
+          <div class="source-row">
+            <div class="source-icon" style="background:#FF4500">R</div>
+            <div class="source-info">
+              <div class="source-name">Reddit Official API</div>
+              <div class="source-detail">OAuth app, free tier</div>
+            </div>
+            <span class="source-cost cost-free">$0</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#1DA1F2">X</div>
+            <div class="source-info">
+              <div class="source-name">X API Basic Tier</div>
+              <div class="source-detail">10k reads/month, search + user timeline</div>
+            </div>
+            <span class="source-cost cost-paid">$100/mo</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#013369">N</div>
+            <div class="source-info">
+              <div class="source-name">SportsDataIO Standard</div>
+              <div class="source-detail">Full stats, projections, real-time scores</div>
+            </div>
+            <span class="source-cost cost-paid">$25/mo</span>
+          </div>
+          <div class="source-row">
+            <div class="source-icon" style="background:#059669">F</div>
+            <div class="source-info">
+              <div class="source-name">FantasyPros API</div>
+              <div class="source-detail">Structured rankings, ECR, projections</div>
+            </div>
+            <span class="source-cost cost-paid">~$30/mo</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="option-summary">
+        Go all-in on official, documented APIs for every source. Reddit free tier, X Basic ($100/month for 10k tweet reads), SportsDataIO Standard ($25/month for full stats + projections), and FantasyPros API ($30/month). Total: ~$155/month during NFL season. You get the most reliable, richest data from every source with no scraping fragility. The X API gives you direct access to beat reporter tweets with search and user timeline endpoints.
+      </div>
+
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Budget allows ~$155/month for premium data quality</li>
+            <li>You want zero scraping maintenance and fully documented APIs</li>
+            <li>Twitter/X beat reporter coverage is a priority signal</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>$155/month is steep for a feature that's still being validated</li>
+            <li>X API is famously unstable -- pricing and limits change frequently</li>
+            <li>Hard to justify the cost before you know if users value the signals</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Free Stack</th>
+            <th class="col-b">B: Stable Core</th>
+            <th class="col-c">C: Bluesky Pivot</th>
+            <th class="col-d">D: Premium</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Monthly cost</td>
+            <td class="col-recommended">$0</td>
+            <td>~$30</td>
+            <td>$0</td>
+            <td>~$155</td>
+          </tr>
+          <tr>
+            <td>Social sources</td>
+            <td class="col-recommended">Reddit + Twitter (via Nitter)</td>
+            <td>Reddit only</td>
+            <td>Reddit + Bluesky</td>
+            <td>Reddit + Twitter (official)</td>
+          </tr>
+          <tr>
+            <td>NFL stats reliability</td>
+            <td class="col-recommended">Low (undocumented ESPN)</td>
+            <td>High (SportsDataIO)</td>
+            <td>Low (undocumented ESPN)</td>
+            <td>High (SportsDataIO)</td>
+          </tr>
+          <tr>
+            <td>Rankings reliability</td>
+            <td class="col-recommended">Low (scraping)</td>
+            <td>High (paid API)</td>
+            <td>Low (scraping)</td>
+            <td>High (paid API)</td>
+          </tr>
+          <tr>
+            <td>API stability</td>
+            <td class="col-recommended">Fragile -- could break anytime</td>
+            <td>Mostly stable</td>
+            <td>Mixed (ESPN fragile, rest stable)</td>
+            <td>Stable but X API is unpredictable</td>
+          </tr>
+          <tr>
+            <td>Setup complexity</td>
+            <td class="col-recommended">Medium (scraping logic)</td>
+            <td>Low (official SDKs)</td>
+            <td>Medium (AT Protocol + scraping)</td>
+            <td>Low (all official)</td>
+          </tr>
+          <tr>
+            <td>Expert tweet coverage</td>
+            <td class="col-recommended">Unreliable (Nitter)</td>
+            <td>None (deferred)</td>
+            <td>Partial (Bluesky subset)</td>
+            <td>Full (X API)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-013 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>

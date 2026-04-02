@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 28: Conversation Threading Model — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.interaction { background: #e0f2fe; color: #0369a1; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen:hover { border-color: #059669; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.25rem; background: #f8fafc; display: flex; align-items: flex-start; justify-content: center; flex: 1; min-height: 200px; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; background: white; }
+    .comparison-table th:first-child { background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+
+    /* Mobile UI mockups */
+    .mobile-screen { background: #1a1a1a; border-radius: 16px; overflow: hidden; width: 200px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .mobile-header { background: #242424; padding: 10px 14px; border-bottom: 1px solid #333; }
+    .mobile-title { color: #c9a96e; font-size: 0.72rem; font-weight: 700; }
+    .mobile-subtitle { color: #64748b; font-size: 0.58rem; margin-top: 1px; }
+    .mobile-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+    .thread-item { background: #2a2a2a; border-radius: 8px; padding: 7px 10px; border-left: 3px solid #c9a96e; }
+    .thread-title { color: #e8e2d6; font-size: 0.62rem; font-weight: 600; }
+    .thread-preview { color: #64748b; font-size: 0.55rem; margin-top: 2px; }
+    .thread-date { color: #475569; font-size: 0.5rem; margin-top: 2px; }
+    .thread-item.active { border-left-color: #4ade80; background: #1f2e24; }
+    .thread-item.faded { opacity: 0.5; }
+
+    .single-thread { background: #1a1a1a; border-radius: 16px; overflow: hidden; width: 200px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .chat-msg { border-radius: 10px; padding: 7px 10px; font-size: 0.6rem; line-height: 1.5; max-width: 80%; }
+    .chat-msg.user { background: #c9a96e; color: #1a1a1a; align-self: flex-end; font-weight: 500; border-bottom-right-radius: 3px; }
+    .chat-msg.ai { background: #2d2d2d; color: #e8e2d6; align-self: flex-start; border-bottom-left-radius: 3px; }
+    .chat-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+
+    .new-thread-btn { background: #242424; border: 1px dashed #444; border-radius: 8px; padding: 7px 10px; text-align: center; color: #c9a96e; font-size: 0.6rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 28 of 28</span>
+    <h1>Conversation Threading Model</h1>
+    <span class="category-badge interaction">Interaction</span>
+    <p class="decision-description">
+      If a user chats with the AI about their BIG12 league on Monday, then opens the app on Thursday, what do they see? A blank slate? Their prior conversation still open? A list of past chats to pick from? This shapes the entire navigation design for the Chat tab and determines how conversation history storage (decision 025) actually surfaces to the user.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option A but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- OPTION A: One persistent thread per league (Recommended) -->
+    <article class="option-card option-a not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">One Thread Per League</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+          <div class="mobile-screen">
+            <div class="mobile-header">
+              <div class="mobile-title">AI Chat</div>
+              <div class="mobile-subtitle">Your leagues</div>
+            </div>
+            <div class="mobile-body">
+              <div class="thread-item active">
+                <div class="thread-title">BIG12 League</div>
+                <div class="thread-preview">"...Frank dominated the 2024 draft"</div>
+                <div class="thread-date">Today</div>
+              </div>
+              <div class="thread-item">
+                <div class="thread-title">Blake's Shoes</div>
+                <div class="thread-preview">"...your 2023 record was 9-4"</div>
+                <div class="thread-date">3 days ago</div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:0.6rem;color:#94a3b8;text-align:center">tap a league to continue the conversation</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        One ongoing conversation per league, automatically scoped. Opening the Chat tab shows your leagues as entry points — tapping BIG12 drops you into the thread where you left off. The model always knows which league you're talking about because it's baked into the thread. No thread management needed from the user. If you have 3 leagues, you have 3 independent conversations. Simple, matches how users think about their leagues.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Natural mapping: one league = one conversation</li>
+            <li>No thread UI complexity — zero decisions for the user</li>
+            <li>League context is automatic — never ambiguous</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Very long threads over time — need a turn window to keep context manageable</li>
+            <li>Can't ask a fresh question without old context polluting it</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- OPTION B: One thread per league + "New Chat" button -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Per-League + Fresh Start</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+          <div class="mobile-screen">
+            <div class="mobile-header">
+              <div class="mobile-title">BIG12 League — AI Chat</div>
+            </div>
+            <div class="mobile-body">
+              <div class="thread-item active">
+                <div class="thread-title">Current conversation</div>
+                <div class="thread-preview">"...Frank dominated the 2024 draft"</div>
+                <div class="thread-date">Ongoing</div>
+              </div>
+              <div class="new-thread-btn">+ New Chat</div>
+              <div class="thread-item faded">
+                <div class="thread-title">Past chat — Apr 1</div>
+                <div class="thread-preview">"...your record vs Jake"</div>
+                <div class="thread-date">Archived</div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:0.6rem;color:#94a3b8;text-align:center">one ongoing + ability to start fresh</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Same as Option A — one primary thread per league — but with a "New Chat" button that archives the current thread and starts fresh. The archived threads are visible but not surfaced prominently. This solves the "long thread getting stale" problem and lets users start a focused conversation without old context dragging along. It's a small addition to Option A with meaningful UX benefit — especially when the user wants to ask something completely unrelated to their last conversation.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Combines continuity (default) with the escape valve of a fresh start</li>
+            <li>Keeps context clean without forcing users to manage threads</li>
+            <li>Minimal added complexity over Option A</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Slightly more complex DB model — threads need a status (active/archived)</li>
+            <li>Archived thread list could grow messy over time</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- OPTION C: Fully ephemeral (no persistence) -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Ephemeral Sessions</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+          <div class="single-thread" style="background:#1a1a1a;">
+            <div class="mobile-header" style="background:#242424;">
+              <div class="mobile-title">AI Chat — BIG12 League</div>
+              <div class="mobile-subtitle">Conversation resets each session</div>
+            </div>
+            <div class="chat-body">
+              <div class="chat-msg ai">What would you like to know about your BIG12 league?</div>
+              <div class="chat-msg user">Who's my biggest rival?</div>
+              <div class="chat-msg ai">Based on your record, Jake has been your closest matchup...</div>
+            </div>
+          </div>
+          <div style="font-size:0.6rem;color:#e11d48;text-align:center">chat history gone on next app open</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        The chat tab opens fresh every time. Within a session, the model remembers your conversation. Close the app and everything resets — next time you open it, it greets you as if you've never chatted before. No DB storage needed for messages (aligns with Option D from decision 025). Simplest to build, but feels low-quality compared to every chat product users interact with. The absence of history also removes any "wow, it remembered what we talked about" moment.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Simplest implementation — no storage, no thread model</li>
+            <li>No stale context pollution across sessions</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Every session starts cold — no continuity, feels disposable</li>
+            <li>Users re-ask the same questions every time they open the app</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- OPTION D: User-created named threads -->
+    <article class="option-card option-d chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">User-Named Threads</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+          <div class="mobile-screen">
+            <div class="mobile-header">
+              <div class="mobile-title">BIG12 — Chats</div>
+            </div>
+            <div class="mobile-body">
+              <div class="new-thread-btn">+ New Chat</div>
+              <div class="thread-item active">
+                <div class="thread-title">2024 Season Recap</div>
+                <div class="thread-preview">"Frank led with 1,847 pts..."</div>
+                <div class="thread-date">Today</div>
+              </div>
+              <div class="thread-item">
+                <div class="thread-title">Draft Analysis</div>
+                <div class="thread-preview">"Your ADP value picks..."</div>
+                <div class="thread-date">Mar 28</div>
+              </div>
+              <div class="thread-item">
+                <div class="thread-title">Head-to-head history</div>
+                <div class="thread-preview">"Jake is 8-14 against you"</div>
+                <div class="thread-date">Mar 20</div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:0.6rem;color:#94a3b8;text-align:center">ChatGPT-style thread management</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        A full ChatGPT-style interface — users explicitly create threads, can name them, and switch between multiple active conversations about the same league. One thread for "draft analysis", another for "head-to-head history", another for "start/sit decisions". Most flexible, most powerful, but requires users to manage threads themselves. Adds a thread list view, thread creation UI, and thread naming — significant scope beyond the core chat experience. Worth it if this becomes a power feature, overkill for a V2 launch.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Power users want to keep different conversations separate</li>
+            <li>Full ChatGPT-style familiarity for frequent users</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Significant extra UI — thread list, creation flow, naming</li>
+            <li>Overcomplicates V2 launch — this is more of a V3 refinement</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">Option A: One Per League</th>
+            <th class="col-b">Option B: Per-League + Fresh Start</th>
+            <th class="col-c">Option C: Ephemeral</th>
+            <th class="col-d">Option D: Named Threads</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>History persists across sessions</td>
+            <td class="col-recommended">Yes</td>
+            <td>Yes</td>
+            <td>No</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>User thread management required</td>
+            <td class="col-recommended">None</td>
+            <td>Optional</td>
+            <td>None</td>
+            <td>Required</td>
+          </tr>
+          <tr>
+            <td>Can start fresh without history</td>
+            <td class="col-recommended">No</td>
+            <td>Yes</td>
+            <td>Always fresh</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>League context always clear</td>
+            <td class="col-recommended">Yes (thread = league)</td>
+            <td>Yes</td>
+            <td>Yes (per session)</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>UI complexity</td>
+            <td class="col-recommended">Low</td>
+            <td>Low–moderate</td>
+            <td>Lowest</td>
+            <td>High</td>
+          </tr>
+          <tr>
+            <td>V2 scope fit</td>
+            <td class="col-recommended">Right-sized</td>
+            <td>Right-sized</td>
+            <td>Too minimal</td>
+            <td>Too much</td>
+          </tr>
+          <tr>
+            <td>DB model needed</td>
+            <td class="col-recommended">ChatThread + ChatMessage</td>
+            <td>+ status field</td>
+            <td>None</td>
+            <td>+ title, ordering</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option B but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-028 I want Option B instead"</strong></p>
+  </div>
+
+</body>
+</html>
