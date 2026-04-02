@@ -1,0 +1,316 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Users & Auth ───────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique @map("clerk_id")
+  email     String   @unique
+  name      String?
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  providerAccounts  ProviderAccount[]
+  leagueMemberships LeagueMember[]
+  managers          Manager[]
+
+  @@map("users")
+}
+
+model ProviderAccount {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  provider       Provider
+  providerUserId String    @map("provider_user_id")
+  accessToken    String?   @map("access_token")
+  refreshToken   String?   @map("refresh_token")
+  tokenExpiry    DateTime? @map("token_expiry")
+  metadata       Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@map("provider_accounts")
+}
+
+enum Provider {
+  YAHOO
+  ESPN
+  SLEEPER
+}
+
+// ─── Leagues ────────────────────────────────────────────────
+
+model League {
+  id               String   @id @default(cuid())
+  name             String
+  provider         Provider
+  providerLeagueId String   @map("provider_league_id")
+  sportType        String   @default("nfl") @map("sport_type")
+  scoringType      String?  @map("scoring_type")
+  teamCount        Int?     @map("team_count")
+  metadata             Json?
+  inviteCode           String?   @unique @map("invite_code")
+  inviteCodeExpiresAt  DateTime? @map("invite_code_expires_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  seasons      Season[]
+  members      LeagueMember[]
+  managers     Manager[]
+  chatThreads  ChatThread[]
+
+  @@unique([provider, providerLeagueId])
+  @@map("leagues")
+}
+
+model LeagueMember {
+  id       String     @id @default(cuid())
+  userId   String     @map("user_id")
+  leagueId String     @map("league_id")
+  role     LeagueRole @default(MEMBER)
+  joinedAt DateTime   @default(now()) @map("joined_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, leagueId])
+  @@map("league_members")
+}
+
+enum LeagueRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ─── Managers (fantasy team owners across seasons) ──────────
+
+model Manager {
+  id                String   @id @default(cuid())
+  leagueId          String   @map("league_id")
+  providerManagerId String   @map("provider_manager_id")
+  name              String
+  avatarUrl         String?  @map("avatar_url")
+  userId            String?  @map("user_id")
+  metadata          Json?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  league        League          @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  seasonEntries SeasonManager[]
+  homeMatchups  Matchup[]       @relation("HomeManager")
+  awayMatchups  Matchup[]       @relation("AwayManager")
+  draftPicks    DraftPick[]
+  transactions  Transaction[]
+
+  @@unique([leagueId, providerManagerId])
+  @@map("managers")
+}
+
+// ─── Seasons ────────────────────────────────────────────────
+
+model Season {
+  id                String       @id @default(cuid())
+  leagueId          String       @map("league_id")
+  year              Int
+  providerSeasonId  String?      @map("provider_season_id")
+  status            SeasonStatus @default(IMPORTED)
+  championManagerId String?      @map("champion_manager_id")
+  metadata          Json?
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  league       League          @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  managers     SeasonManager[]
+  matchups     Matchup[]
+  draftPicks   DraftPick[]
+  standings    Standing[]
+  transactions Transaction[]
+
+  @@unique([leagueId, year])
+  @@map("seasons")
+}
+
+enum SeasonStatus {
+  IMPORTING
+  IMPORTED
+  FAILED
+}
+
+model SeasonManager {
+  id            String  @id @default(cuid())
+  seasonId      String  @map("season_id")
+  managerId     String  @map("manager_id")
+  teamName      String  @map("team_name")
+  finalRank     Int?    @map("final_rank")
+  wins          Int     @default(0)
+  losses        Int     @default(0)
+  ties          Int     @default(0)
+  pointsFor     Float   @default(0) @map("points_for")
+  pointsAgainst Float   @default(0) @map("points_against")
+  madePlayoffs  Boolean @default(false) @map("made_playoffs")
+  metadata      Json?
+
+  season  Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  manager Manager @relation(fields: [managerId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, managerId])
+  @@map("season_managers")
+}
+
+// ─── Matchups ───────────────────────────────────────────────
+
+model Matchup {
+  id            String      @id @default(cuid())
+  seasonId      String      @map("season_id")
+  week          Int
+  matchupType   MatchupType @default(REGULAR) @map("matchup_type")
+  homeManagerId String      @map("home_manager_id")
+  awayManagerId String      @map("away_manager_id")
+  homeScore     Float?      @map("home_score")
+  awayScore     Float?      @map("away_score")
+  metadata      Json?
+
+  season      Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  homeManager Manager @relation("HomeManager", fields: [homeManagerId], references: [id], onDelete: Cascade)
+  awayManager Manager @relation("AwayManager", fields: [awayManagerId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, week, homeManagerId, awayManagerId])
+  @@map("matchups")
+}
+
+enum MatchupType {
+  REGULAR
+  PLAYOFF
+  CONSOLATION
+  CHAMPIONSHIP
+}
+
+// ─── Standings ──────────────────────────────────────────────
+
+model Standing {
+  id            String @id @default(cuid())
+  seasonId      String @map("season_id")
+  managerId     String @map("manager_id")
+  week          Int
+  rank          Int
+  wins          Int    @default(0)
+  losses        Int    @default(0)
+  ties          Int    @default(0)
+  pointsFor     Float  @default(0) @map("points_for")
+  pointsAgainst Float  @default(0) @map("points_against")
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, managerId, week])
+  @@map("standings")
+}
+
+// ─── Draft ──────────────────────────────────────────────────
+
+model DraftPick {
+  id         String  @id @default(cuid())
+  seasonId   String  @map("season_id")
+  managerId  String  @map("manager_id")
+  round      Int
+  pickNumber Int     @map("pick_number")
+  playerName String  @map("player_name")
+  position   String?
+  metadata   Json?
+
+  season  Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  manager Manager @relation(fields: [managerId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, round, pickNumber])
+  @@map("draft_picks")
+}
+
+// ─── Transactions ───────────────────────────────────────────
+
+model Transaction {
+  id              String          @id @default(cuid())
+  seasonId        String          @map("season_id")
+  managerId       String          @map("manager_id")
+  type            TransactionType
+  playerName      String          @map("player_name")
+  week            Int?
+  transactionDate DateTime?       @map("transaction_date")
+  metadata        Json?
+
+  season  Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  manager Manager @relation(fields: [managerId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+enum TransactionType {
+  ADD
+  DROP
+  TRADE
+  WAIVER
+}
+
+// ─── Sync Jobs ──────────────────────────────────────────────
+
+model SyncJob {
+  id          String     @id @default(cuid())
+  leagueId    String     @map("league_id")
+  status      SyncStatus @default(PENDING)
+  jobType     String     @map("job_type")
+  syncMode    String     @default("full") @map("sync_mode")
+  progress    Int        @default(0)
+  totalItems  Int?       @map("total_items")
+  error       String?
+  startedAt   DateTime?  @map("started_at")
+  completedAt DateTime?  @map("completed_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@map("sync_jobs")
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ─── AI Chat ─────────────────────────────────────────────────
+
+model ChatThread {
+  id        String        @id @default(cuid())
+  userId    String        // Clerk user ID
+  leagueId  String        // FK to League
+  title     String        // user-named, e.g. "2024 draft review"
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+
+  league    League        @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@index([userId, leagueId])
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  threadId  String
+  role      String      // "user" | "assistant" | "tool"
+  content   String      @db.Text
+  toolName  String?     // populated when role = "tool"
+  toolCallId String?    @map("tool_call_id")
+  createdAt DateTime    @default(now())
+
+  thread    ChatThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}
