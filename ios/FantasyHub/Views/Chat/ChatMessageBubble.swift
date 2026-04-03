@@ -7,12 +7,9 @@ struct ChatMessageBubble: View {
     let message: ChatMessage
 
     var body: some View {
-        switch message.role {
-        case "user":
+        if message.role == "user" {
             userBubble
-        case "tool":
-            toolCallBubble
-        default:
+        } else {
             assistantBubble
         }
     }
@@ -61,29 +58,6 @@ struct ChatMessageBubble: View {
 
     // MARK: - Tool Call Bubble
 
-    private var toolCallBubble: some View {
-        HStack(alignment: .center, spacing: Theme.spacingSM) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Theme.accentMuted)
-
-            if let toolName = message.toolName {
-                Text("Looked up \(toolName)…")
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Theme.textSecondary)
-            } else {
-                Text(message.content)
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Theme.textSecondary)
-            }
-
-            Spacer()
-        }
-        .padding(.horizontal, Theme.spacingMD)
-        .padding(.vertical, Theme.spacingXS)
-        .background(Theme.surface.opacity(0.6))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM))
-    }
 }
 
 // MARK: - Streaming Bubble

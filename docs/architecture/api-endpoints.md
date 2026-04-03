@@ -41,6 +41,91 @@ All scoped to `/leagues/:leagueId/analytics/...`
 |--------|------|-------------|--------|
 | GET | `/leagues/:leagueId/activity` | Recent activity feed | Built |
 
+## AI Chat
+
+All scoped to `/leagues/:leagueId/chat/...`. Require auth + league membership.
+
+| Method | Path | Body / Query | Description | Status |
+|--------|------|-------------|-------------|--------|
+| POST | `/chat/threads` | `{ title }` | Create a named thread (max 120 chars) | Built |
+| GET | `/chat/threads` | — | List user's threads, ordered by `updatedAt` desc | Built |
+| DELETE | `/chat/threads/:threadId` | — | Delete thread + messages (403 if not owner) | Built |
+| POST | `/chat/threads/:threadId/messages` | `{ content }` | Send message — returns `text/event-stream` SSE | Built |
+| GET | `/chat/threads/:threadId/messages` | `?limit=&before=` | Paginated message history, oldest-first | Built |
+
+### SSE Event Format
+
+The send-message endpoint streams newline-delimited JSON `data:` lines. Each line is a self-contained event distinguished by the `type` field:
+
+```
+data: {"type":"tool_call","toolName":"get_standings","status":"running"}
+data: {"type":"delta","content":"Ryan Curran led the league"}
+data: {"type":"delta","content":" with 1,564 points."}
+data: {"type":"done","messageId":"clxyz..."}
+data: {"type":"error","error":"OpenAI quota exceeded"}
+```
+
+### AI Tools
+
+The send-message pipeline can invoke any of 8 tools against the league's DB. Tool calls and results are persisted as `ChatMessage` rows (role `"assistant"` and `"tool"` respectively) linked by `toolCallId`.
+
+| Tool | Description |
+|------|-------------|
+| `get_standings` | Season standings, optional `season` filter |
+| `get_manager_stats` | W-L-T + scoring stats for one manager |
+| `get_matchup_history` | Head-to-head record between two managers |
+| `get_draft_results` | All picks for a season, ordered by pick number |
+| `get_weekly_scores` | Matchup scores for a season, optional `week` filter |
+| `get_league_records` | All-time high scores, champions, win leaders |
+| `get_playoff_results` | Regular-season vs playoff PPG, clutch ratings |
+| `get_transaction_history` | Adds, drops, trades, waiver moves |
+
+### Chat Message Response
+
+```json
+{
+  "messages": [
+    {
+      "id": "cl...",
+      "threadId": "cl...",
+      "role": "user",
+      "content": "Who led the league in scoring in 2024?",
+      "toolName": null,
+      "toolCallId": null,
+      "createdAt": "2026-04-02T00:00:00.000Z"
+    },
+    {
+      "id": "cl...",
+      "threadId": "cl...",
+      "role": "assistant",
+      "content": "",
+      "toolName": "get_standings",
+      "toolCallId": "call_abc123",
+      "createdAt": "2026-04-02T00:00:00.000Z"
+    },
+    {
+      "id": "cl...",
+      "threadId": "cl...",
+      "role": "tool",
+      "content": "[{\"season\":2024,...}]",
+      "toolName": "get_standings",
+      "toolCallId": "call_abc123",
+      "createdAt": "2026-04-02T00:00:00.000Z"
+    },
+    {
+      "id": "cl...",
+      "threadId": "cl...",
+      "role": "assistant",
+      "content": "Ryan Curran led the league with 1,564.88 points in 2024.",
+      "toolName": null,
+      "toolCallId": null,
+      "createdAt": "2026-04-02T00:00:00.000Z"
+    }
+  ],
+  "hasMore": false
+}
+```
+
 ## Response Formats
 
 All responses are JSON with camelCase keys (Prisma default). The iOS client uses `.convertFromSnakeCase` decoder strategy, which passes camelCase keys through unchanged.
