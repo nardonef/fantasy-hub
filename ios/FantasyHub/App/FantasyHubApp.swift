@@ -8,7 +8,7 @@ struct FantasyHubApp: App {
     @State private var pendingInviteCode: String?
 
     init() {
-        Clerk.configure(publishableKey: "YOUR_CLERK_PUBLISHABLE_KEY")
+        Clerk.configure(publishableKey: "pk_test_Z29vZC1naXJhZmZlLTQ5LmNsZXJrLmFjY291bnRzLmRldiQ")
     }
 
     var body: some Scene {

@@ -1,9 +1,22 @@
 import SwiftUI
 
+// MARK: - Tab Bar Hidden Preference Key
+// Child views set this to true to hide the custom tab bar.
+// PreferenceKey flows UP from child to parent — the correct
+// SwiftUI pattern for child-to-parent communication.
+
+struct TabBarHiddenKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        value = value || nextValue()
+    }
+}
+
 struct MainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var leagueStore: LeagueStore
     @State private var selectedTab: Tab = .dashboard
+    @State private var isTabBarVisible = true
 
     enum Tab: String {
         case dashboard, analytics, chat, league, profile
@@ -30,9 +43,14 @@ struct MainTabView: View {
             .tabViewStyle(.automatic)
             .toolbar(.hidden, for: .tabBar)
             .tint(Theme.accent)
+            .onPreferenceChange(TabBarHiddenKey.self) { hidden in
+                isTabBarVisible = !hidden
+            }
 
-            // Custom tab bar
-            CustomTabBar(selectedTab: $selectedTab)
+            // Custom tab bar — hidden when a child view requests it via TabBarHiddenKey
+            if isTabBarVisible {
+                CustomTabBar(selectedTab: $selectedTab)
+            }
         }
         .background(Theme.background)
         .task {
@@ -43,11 +61,27 @@ struct MainTabView: View {
                 .environmentObject(authManager)
                 .environmentObject(leagueStore)
         }
+        .fullScreenCover(isPresented: showLoadError) {
+            LeagueLoadErrorView {
+                Task { await leagueStore.loadLeagues() }
+            }
+            .environmentObject(leagueStore)
+        }
     }
 
+    /// Only show onboarding when the load succeeded but returned no leagues.
+    /// A failed fetch (error != nil) is handled separately by showLoadError.
     private var showOnboarding: Binding<Bool> {
         Binding(
-            get: { leagueStore.hasAttemptedLoad && !leagueStore.hasLeagues },
+            get: { leagueStore.hasAttemptedLoad && !leagueStore.hasLeagues && leagueStore.error == nil },
+            set: { _ in }
+        )
+    }
+
+    /// Show a recoverable error screen when the league fetch fails.
+    private var showLoadError: Binding<Bool> {
+        Binding(
+            get: { leagueStore.hasAttemptedLoad && leagueStore.error != nil },
             set: { _ in }
         )
     }

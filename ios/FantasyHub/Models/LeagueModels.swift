@@ -456,9 +456,8 @@ struct ChatThread: Codable, Identifiable {
 struct ChatMessage: Codable, Identifiable {
     let id: String
     let threadId: String
-    let role: String   // "user" | "assistant" | "tool"
+    let role: String   // "user" | "assistant"
     let content: String
-    let toolName: String?
     let createdAt: Date
 }
 

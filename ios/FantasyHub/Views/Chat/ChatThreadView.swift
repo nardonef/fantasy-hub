@@ -7,6 +7,7 @@ struct ChatThreadView: View {
     let league: League
     let thread: ChatThread
 
+
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var isStreaming = false
@@ -102,6 +103,7 @@ struct ChatThreadView: View {
         .task {
             await loadHistory()
         }
+        .preference(key: TabBarHiddenKey.self, value: true)
     }
 
     // MARK: - Inline Subviews
@@ -167,7 +169,6 @@ struct ChatThreadView: View {
             threadId: thread.id,
             role: "user",
             content: content,
-            toolName: nil,
             createdAt: Date()
         )
         messages.append(localUserMessage)
@@ -236,7 +237,6 @@ struct ChatThreadView: View {
                 threadId: thread.id,
                 role: "assistant",
                 content: streamingContent,
-                toolName: nil,
                 createdAt: Date()
             )
             messages.append(finalMessage)

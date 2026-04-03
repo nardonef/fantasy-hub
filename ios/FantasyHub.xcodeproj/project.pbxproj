@@ -19,6 +19,7 @@
 		319474E35882C785574D08C8 /* SharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA99B82AD63AE8FFED77A97F /* SharedComponents.swift */; };
 		35A79773703A526B90EE4CE1 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 166A104E7E0D82FC4C11A9A6 /* ClerkKit */; };
 		455A4E6503E3972C79CCE9B9 /* DraftDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8EDBA59AE3D84E183B3743F /* DraftDetailView.swift */; };
+		544A8DEFF682D139EC85CE3B /* LeagueLoadErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52BE926A77CB3A17A2BF90EC /* LeagueLoadErrorView.swift */; };
 		5E5B723371668397B7C04BAB /* RivalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D725DAE29390B780FEFD7B /* RivalCard.swift */; };
 		6FE59178E39F7BEA2D557627 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC16A1D595DB2DA698A4EB5 /* ProfileView.swift */; };
 		728542EA9CE15A9435E70E02 /* PlayoffPerformanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26D1F53A9F14FEB1F3528EF /* PlayoffPerformanceView.swift */; };
@@ -69,6 +70,7 @@
 		3FD6C1B94AC538AB01F30CBC /* ChatMessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessageBubble.swift; sourceTree = "<group>"; };
 		4AC16A1D595DB2DA698A4EB5 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		50D725DAE29390B780FEFD7B /* RivalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RivalCard.swift; sourceTree = "<group>"; };
+		52BE926A77CB3A17A2BF90EC /* LeagueLoadErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeagueLoadErrorView.swift; sourceTree = "<group>"; };
 		57BD382BDE8F18743B36521B /* StandingsDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StandingsDetailView.swift; sourceTree = "<group>"; };
 		594D8F9C2AD001D2E8A3F430 /* NewThreadSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewThreadSheet.swift; sourceTree = "<group>"; };
 		5D5CEC72C33393643EDBB43D /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
@@ -258,6 +260,7 @@
 			isa = PBXGroup;
 			children = (
 				B037465B39F7D52E58BB9D69 /* ErrorStateView.swift */,
+				52BE926A77CB3A17A2BF90EC /* LeagueLoadErrorView.swift */,
 				CA99B82AD63AE8FFED77A97F /* SharedComponents.swift */,
 				148CF4B2683313A9BD437A4D /* ShimmerView.swift */,
 				D6CB412E1C006A552FA5B5A0 /* SkeletonViews.swift */,
@@ -365,6 +368,7 @@
 				DCB1ECEEDD0D016D34DD6994 /* ImportProgressView.swift in Sources */,
 				B6F3195EB8181C621CD83564 /* InsightBannerView.swift in Sources */,
 				D5C7E705DF3F375273BDA216 /* InviteView.swift in Sources */,
+				544A8DEFF682D139EC85CE3B /* LeagueLoadErrorView.swift in Sources */,
 				BEA043957D0C45BD65A2A918 /* LeagueModels.swift in Sources */,
 				19AE7593E2FD963CAE5977B8 /* LeagueStore.swift in Sources */,
 				E35C859340F82092E648386C /* LeagueView.swift in Sources */,

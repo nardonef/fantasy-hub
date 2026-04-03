@@ -1,8 +1,8 @@
 # Fantasy League Hub — Progress Tracker
 
-> **Last updated**: 2026-03-26
-> **Current phase**: V1 — Core Analytics
-> **Goal**: Ship Yahoo + Sleeper with full analytics, no AI
+> **Last updated**: 2026-04-02
+> **Current phase**: V2 — AI Chat (complete, pending iOS end-to-end test with real auth)
+> **Goal**: ChatGPT-style natural language interface for league history, scoped to a single league
 
 ---
 
@@ -170,17 +170,59 @@
 
 ---
 
-## V2 — AI + Social (not started)
+## V2 — AI Chat ✅ COMPLETE (pending iOS end-to-end test)
 
-- [ ] pgvector setup + embedding pipeline
-- [ ] RAG + Tool Use backend
-- [ ] Full-screen AI Chat tab
-- [ ] Contextual "Ask AI" triggers
+### Decisions (025–028)
+- [x] Decision 025 — Conversation History Storage: Persistent DB Threads (ChatThread + ChatMessage)
+- [x] Decision 026 — Streaming: SSE Token Streaming (typewriter effect via `text/event-stream`)
+- [x] Decision 027 — Context Injection: Lean Header (~200 tokens) + Tools (on-demand) + RAG
+- [x] Decision 028 — Threading Model: User-Named Threads per league
+
+### API — Chat Endpoints ✅ COMPLETE
+- [x] `POST /chat/threads` — create named thread (title, 120 char max)
+- [x] `GET /chat/threads` — list user's threads, ordered by updatedAt desc
+- [x] `DELETE /chat/threads/:threadId` — delete thread + messages (403 if not owner)
+- [x] `POST /chat/threads/:threadId/messages` — SSE stream with OpenAI agentic loop
+- [x] `GET /chat/threads/:threadId/messages` — paginated history (limit/before cursor)
+
+### AI Layer ✅ COMPLETE
+- [x] `src/lib/ai/prompt.ts` — lean system prompt builder (<300 tokens)
+- [x] `src/lib/ai/tools.ts` — 8 tool definitions + executors (get_standings, get_manager_stats, get_matchup_history, get_draft_results, get_weekly_scores, get_league_records, get_playoff_results, get_transaction_history)
+- [x] `src/lib/ai/rag.ts` — pgvector RAG retrieval with graceful degradation when table absent
+- [x] Agentic loop in `chat.ts` — multi-turn tool accumulation, parallel execution, MAX_TOOL_ITERATIONS=8 guard
+
+### iOS — Chat UI ✅ COMPLETE
+- [x] `ChatTabView` — replaces placeholder Chat tab, lists leagues
+- [x] `ThreadListView` — thread list with message count badge, delete swipe, new thread button
+- [x] `NewThreadSheet` — modal text field for thread name
+- [x] `ChatThreadView` — full-screen chat with SSE streaming via `URLSession AsyncBytes`
+- [x] `ChatMessageBubble` — user (right, gold) and assistant (left, surface) bubble styles
+- [x] `ChatInputBar` — send/stop button, streaming lock
+- [x] `ChatStreamingIndicator` — animated typing dots
+- [x] `StreamingMessageBubble` — live token accumulation bubble
+- [x] `ChatSSEEvent` — enum with `parse(from:)` for `data: {"type":...}` JSON lines
+
+### Data Model ✅ COMPLETE
+- [x] `ChatThread` — userId (Clerk ID), leagueId, title, timestamps, messages relation
+- [x] `ChatMessage` — threadId, role, content, toolName?, toolCallId?, createdAt
+- [x] Schema applied via `prisma db push`
+
+### Spec & Docs ✅ COMPLETE
+- [x] `docs/features/ai-chat-spec.md` — full spec (API shape, data model, iOS view hierarchy, AI architecture)
+
+### Verification ✅ ALL PASSING
+- [x] `verify-tools.ts` — all 8 tools fire against real league data (10/10 checks pass)
+- [x] SSE smoke test — full HTTP → OpenAI → SSE → DB pipeline verified end-to-end
+- [x] `verify-sse-tools.ts` — per-tool coverage sweep, 8/8 tools route correctly via natural language
+
+### Remaining
+- [ ] iOS end-to-end test with real Clerk auth (requires build + simulator run)
+- [ ] RAG embedding pipeline — `ChatEmbedding` table population (deferred, tools cover most questions)
 - [ ] ESPN adapter
 - [ ] Weekly recap generation
 - [ ] Push notifications
 - [ ] Manager profile sharing
-- [ ] Manager identity merging / alias system (consolidate fragmented accounts from users who recreated Sleeper/Yahoo accounts across seasons)
+- [ ] Manager identity merging / alias system
 
 ## V3 — Engagement (not started)
 

@@ -469,7 +469,12 @@ router.get("/:leagueId/chat/threads/:threadId/messages", requireAuth, requireLea
       where.createdAt = { lt: beforeDate };
     }
 
-    // Fetch one extra to determine whether more pages exist
+    // Fetch one extra to determine whether more pages exist.
+    // Only return user/assistant roles — tool messages are internal
+    // plumbing required for OpenAI history reconstruction but have
+    // no meaning to the client.
+    where.role = { in: ["user", "assistant"] };
+
     const messages = await prisma.chatMessage.findMany({
       where,
       orderBy: { createdAt: "asc" },
