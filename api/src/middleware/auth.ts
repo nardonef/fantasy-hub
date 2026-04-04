@@ -61,14 +61,14 @@ export async function requireLeagueMember(
   next: NextFunction
 ): Promise<void> {
   const user = (req as any).dbUser;
-  const leagueId = req.params.leagueId;
+  const leagueId = req.params.leagueId as string;
 
   if (!user || !leagueId) {
     res.status(400).json({ error: "Missing user or league ID" });
     return;
   }
 
-  let membership = await prisma.leagueMember.findUnique({
+  const membership = await prisma.leagueMember.findUnique({
     where: {
       userId_leagueId: { userId: user.id, leagueId },
     },

@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
-import { getValidYahooToken } from "../lib/yahoo-tokens";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();

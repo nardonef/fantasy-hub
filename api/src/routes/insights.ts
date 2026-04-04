@@ -28,7 +28,7 @@ router.get(
   requireLeagueMember,
   async (req, res) => {
     try {
-      const { leagueId } = req.params;
+      const { leagueId } = req.params as Record<string, string>;
       const user = (req as any).dbUser;
 
       // Find user's claimed manager
@@ -63,12 +63,6 @@ router.get(
           season: { select: { year: true } },
         },
         orderBy: [{ season: { year: "asc" } }, { week: "asc" }],
-      });
-
-      // Fetch season managers for standings context
-      const seasonManagers = await prisma.seasonManager.findMany({
-        where: { season: { leagueId } },
-        include: { season: { select: { year: true, championManagerId: true } } },
       });
 
       const insights: InsightResult[] = [];

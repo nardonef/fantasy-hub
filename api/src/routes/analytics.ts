@@ -8,7 +8,7 @@ const router = Router();
  *  Season standings with optional year filter */
 router.get("/:leagueId/analytics/standings", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
 
     const where: any = { season: { leagueId } };
@@ -34,7 +34,7 @@ router.get("/:leagueId/analytics/standings", requireAuth, requireLeagueMember, a
  *  Head-to-head records between all managers */
 router.get("/:leagueId/analytics/h2h", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
 
     const matchupWhere: any = { season: { leagueId } };
@@ -113,7 +113,7 @@ router.get("/:leagueId/analytics/h2h", requireAuth, requireLeagueMember, async (
  *  Scoring trends over time */
 router.get("/:leagueId/analytics/scoring", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
     const includeWeekly = req.query.includeWeekly === "true";
 
@@ -195,7 +195,7 @@ router.get("/:leagueId/analytics/scoring", requireAuth, requireLeagueMember, asy
  *  Draft analysis across seasons */
 router.get("/:leagueId/analytics/draft", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
 
     const where: any = { season: { leagueId } };
@@ -221,7 +221,7 @@ router.get("/:leagueId/analytics/draft", requireAuth, requireLeagueMember, async
  *  League records and milestones */
 router.get("/:leagueId/analytics/records", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
 
     // Fetch all matchups with scores to find highest individual performances
     const allMatchups = await prisma.matchup.findMany({
@@ -329,7 +329,7 @@ router.get("/:leagueId/analytics/records", requireAuth, requireLeagueMember, asy
  *  Top/bottom performances, closest games, biggest blowouts */
 router.get("/:leagueId/analytics/extremes", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 10));
 
   const matchups = await prisma.matchup.findMany({
@@ -435,7 +435,7 @@ router.get("/:leagueId/analytics/extremes", requireAuth, requireLeagueMember, as
  *  Playoff vs regular season performance, clutch ratings */
 router.get("/:leagueId/analytics/playoffs", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
 
     const matchups = await prisma.matchup.findMany({
     where: { season: { leagueId }, homeScore: { not: null }, awayScore: { not: null } },
@@ -493,7 +493,7 @@ router.get("/:leagueId/analytics/playoffs", requireAuth, requireLeagueMember, as
  *  Score distribution histogram data */
 router.get("/:leagueId/analytics/distribution", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
 
   const matchupWhere: any = { season: { leagueId }, homeScore: { not: null } };
@@ -546,7 +546,7 @@ router.get("/:leagueId/analytics/distribution", requireAuth, requireLeagueMember
  *  Personal dashboard stats for the authenticated user's claimed manager */
 router.get("/:leagueId/analytics/dashboard", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const user = (req as any).dbUser;
 
     // Find user's claimed manager

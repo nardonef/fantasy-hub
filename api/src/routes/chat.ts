@@ -18,7 +18,7 @@ const router = Router();
  *  Create a new chat thread for the authenticated user in the given league */
 router.post("/:leagueId/chat/threads", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const user = (req as any).dbUser;
     const { title } = req.body;
 
@@ -50,7 +50,7 @@ router.post("/:leagueId/chat/threads", requireAuth, requireLeagueMember, async (
  *  List all threads for the authenticated user in this league, most recently active first */
 router.get("/:leagueId/chat/threads", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
     const user = (req as any).dbUser;
 
     const threads = await prisma.chatThread.findMany({
@@ -75,7 +75,7 @@ router.get("/:leagueId/chat/threads", requireAuth, requireLeagueMember, async (r
  *  Delete a thread and all its messages — only the owning user may do this */
 router.delete("/:leagueId/chat/threads/:threadId", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { threadId } = req.params;
+    const { threadId } = req.params as Record<string, string>;
     const user = (req as any).dbUser;
 
     const thread = await prisma.chatThread.findUnique({
@@ -111,7 +111,7 @@ router.delete("/:leagueId/chat/threads/:threadId", requireAuth, requireLeagueMem
  *    { type: "error",     error: "..." }
  */
 router.post("/:leagueId/chat/threads/:threadId/messages", requireAuth, requireLeagueMember, async (req, res) => {
-  const { leagueId, threadId } = req.params;
+  const { leagueId, threadId } = req.params as Record<string, string>;
   const user = (req as any).dbUser;
   const { content } = req.body;
 
@@ -436,7 +436,7 @@ router.post("/:leagueId/chat/threads/:threadId/messages", requireAuth, requireLe
  *  Retrieve message history for a thread, paginated by timestamp cursor */
 router.get("/:leagueId/chat/threads/:threadId/messages", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { threadId } = req.params;
+    const { threadId } = req.params as Record<string, string>;
     const user = (req as any).dbUser;
 
     // Verify thread ownership

@@ -136,7 +136,7 @@ router.post("/connect", requireAuth, async (req, res) => {
 
 /** GET /api/leagues/invite/:inviteCode — preview an invite (no auth required) */
 router.get("/invite/:inviteCode", async (req, res) => {
-  const { inviteCode } = req.params;
+  const { inviteCode } = req.params as Record<string, string>;
 
   const league = await prisma.league.findUnique({
     where: { inviteCode },
@@ -165,7 +165,7 @@ router.get("/invite/:inviteCode", async (req, res) => {
 /** POST /api/leagues/join/:inviteCode — accept an invite and join the league */
 router.post("/join/:inviteCode", requireAuth, async (req, res) => {
   const user = (req as any).dbUser;
-  const { inviteCode } = req.params;
+  const { inviteCode } = req.params as Record<string, string>;
 
   const league = await prisma.league.findUnique({
     where: { inviteCode },
@@ -215,7 +215,7 @@ router.post("/join/:inviteCode", requireAuth, async (req, res) => {
 /** GET /api/leagues/:leagueId — league detail */
 router.get("/:leagueId", requireAuth, requireLeagueMember, async (req, res) => {
   const league = await prisma.league.findUnique({
-    where: { id: req.params.leagueId },
+    where: { id: req.params.leagueId as string },
     include: {
       seasons: { orderBy: { year: "desc" } },
       managers: true,
@@ -232,7 +232,7 @@ router.get("/:leagueId", requireAuth, requireLeagueMember, async (req, res) => {
 
 /** POST /api/leagues/:leagueId/sync — trigger a sync for an existing league */
 router.post("/:leagueId/sync", requireAuth, requireLeagueMember, async (req, res) => {
-  const leagueId = req.params.leagueId as string;
+  const leagueId = req.params.leagueId as string as string;
   const mode: "full" | "incremental" = req.body?.mode === "incremental" ? "incremental" : "full";
 
   const league = await prisma.league.findUnique({
@@ -308,7 +308,7 @@ router.post("/:leagueId/sync", requireAuth, requireLeagueMember, async (req, res
 /** GET /api/leagues/:leagueId/sync-status — check import progress */
 router.get("/:leagueId/sync-status", requireAuth, async (req, res) => {
   const jobs = await prisma.syncJob.findMany({
-    where: { leagueId: req.params.leagueId },
+    where: { leagueId: req.params.leagueId as string },
     orderBy: { createdAt: "desc" },
     take: 1,
   });
@@ -318,7 +318,7 @@ router.get("/:leagueId/sync-status", requireAuth, async (req, res) => {
 
 /** POST /api/leagues/:leagueId/invite — generate an invite link */
 router.post("/:leagueId/invite", requireAuth, requireLeagueMember, async (req, res) => {
-  const leagueId = req.params.leagueId;
+  const leagueId = req.params.leagueId as string;
   const inviteCode = randomUUID();
   const inviteCodeExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -334,7 +334,7 @@ router.post("/:leagueId/invite", requireAuth, requireLeagueMember, async (req, r
 /** PUT /api/leagues/:leagueId/managers/:managerId/claim — claim a manager as the authenticated user */
 router.put("/:leagueId/managers/:managerId/claim", requireAuth, requireLeagueMember, async (req, res) => {
   const user = (req as any).dbUser;
-  const { leagueId, managerId } = req.params;
+  const { leagueId, managerId } = req.params as Record<string, string>;
 
   // Verify manager exists in this league
   const manager = await prisma.manager.findFirst({
@@ -364,7 +364,7 @@ router.put("/:leagueId/managers/:managerId/claim", requireAuth, requireLeagueMem
 /** GET /api/leagues/:leagueId/my-manager — get the current user's claimed manager */
 router.get("/:leagueId/my-manager", requireAuth, requireLeagueMember, async (req, res) => {
   const user = (req as any).dbUser;
-  const { leagueId } = req.params;
+  const { leagueId } = req.params as Record<string, string>;
 
   const manager = await prisma.manager.findFirst({
     where: { leagueId, userId: user.id },

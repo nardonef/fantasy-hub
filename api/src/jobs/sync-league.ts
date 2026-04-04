@@ -32,7 +32,7 @@ export function startSyncWorker() {
 
       // Determine effective sync mode — fall back to full if no prior sync exists
       let effectiveMode: "full" | "incremental" = requestedMode;
-      let lastSyncCompletedAt: Date | null = null;
+      let _lastSyncCompletedAt: Date | null = null;
 
       if (requestedMode === "incremental") {
         const lastSync = await prisma.syncJob.findFirst({
@@ -40,7 +40,7 @@ export function startSyncWorker() {
           orderBy: { completedAt: "desc" },
         });
         if (lastSync?.completedAt) {
-          lastSyncCompletedAt = lastSync.completedAt;
+          _lastSyncCompletedAt = lastSync.completedAt;
         } else {
           // No prior successful sync — fall back to full
           effectiveMode = "full";
