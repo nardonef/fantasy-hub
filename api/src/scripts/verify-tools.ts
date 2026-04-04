@@ -284,6 +284,7 @@ async function main() {
         teamName: m.name,
         isCurrentUser: false,
       })),
+      teamCount: managers.length,
       currentUserTeamName: managers[0]?.name ?? "Unknown",
       currentUserName: managers[0]?.name ?? "Unknown",
     });

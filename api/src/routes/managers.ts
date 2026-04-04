@@ -8,7 +8,7 @@ const router = Router();
  *  Manager career stats and season-by-season results */
 router.get("/:leagueId/managers/:managerId/profile", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId, managerId } = req.params;
+    const { leagueId, managerId } = req.params as Record<string, string>;
 
     // Fetch manager
     const manager = await prisma.manager.findFirst({

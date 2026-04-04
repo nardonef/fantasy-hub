@@ -8,7 +8,7 @@ const router = Router();
  *  Recent activity feed generated from league data */
 router.get("/:leagueId/activity", requireAuth, requireLeagueMember, async (req, res) => {
   try {
-    const { leagueId } = req.params;
+    const { leagueId } = req.params as Record<string, string>;
   const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
 
