@@ -31,7 +31,7 @@ struct MainTabView: View {
                 AnalyticsView()
                     .tag(Tab.analytics)
 
-                ChatTabView()
+                ChatLandingView()
                     .tag(Tab.chat)
 
                 LeagueView()
