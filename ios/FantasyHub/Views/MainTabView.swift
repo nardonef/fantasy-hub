@@ -22,8 +22,15 @@ struct MainTabView: View {
         case dashboard, analytics, chat, league, profile
     }
 
+    init() {
+        // Fully remove the system UITabBar from the view hierarchy and layout.
+        // .toolbar(.hidden) only hides it visually but keeps the layout footprint;
+        // this eliminates it entirely so our VStack layout is clean.
+        UITabBar.appearance().isHidden = true
+    }
+
     var body: some View {
-        ZStack(alignment: .bottom) {
+        VStack(spacing: 0) {
             TabView(selection: $selectedTab) {
                 DashboardView()
                     .tag(Tab.dashboard)
@@ -41,13 +48,11 @@ struct MainTabView: View {
                     .tag(Tab.profile)
             }
             .tabViewStyle(.automatic)
-            .toolbar(.hidden, for: .tabBar)
             .tint(Theme.accent)
             .onPreferenceChange(TabBarHiddenKey.self) { hidden in
                 isTabBarVisible = !hidden
             }
 
-            // Custom tab bar — hidden when a child view requests it via TabBarHiddenKey
             if isTabBarVisible {
                 CustomTabBar(selectedTab: $selectedTab)
             }
@@ -118,12 +123,15 @@ struct CustomTabBar: View {
             }
         }
         .padding(.top, 12)
-        .padding(.bottom, 24)
+        .padding(.bottom, 8)
         .background(
             Theme.darkSurface
-                .clipShape(.rect(topLeadingRadius: 20, topTrailingRadius: 20))
-                .shadow(color: .black.opacity(0.15), radius: 16, y: -6)
+                .ignoresSafeArea(edges: .bottom)
         )
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 0.5)
+        }
     }
 }
-
