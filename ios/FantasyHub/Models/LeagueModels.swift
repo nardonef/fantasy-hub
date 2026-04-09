@@ -476,8 +476,10 @@ struct SendMessageRequest: Codable {
 
 // MARK: - SSE Event Types
 
-/// Parsed SSE events received from the streaming send-message endpoint.
+/// Parsed SSE events received from the streaming chat endpoints.
 enum ChatSSEEvent {
+    /// Emitted by the /quick combo endpoint when the thread is created, before deltas.
+    case threadCreated(threadId: String, title: String)
     case delta(content: String)
     case toolCall(toolName: String, status: String)
     case done(messageId: String)
@@ -491,6 +493,10 @@ enum ChatSSEEvent {
             return nil
         }
         switch type {
+        case "thread_created":
+            let threadId = obj["threadId"] as? String ?? ""
+            let title = obj["title"] as? String ?? ""
+            return .threadCreated(threadId: threadId, title: title)
         case "delta":
             let content = obj["content"] as? String ?? ""
             return .delta(content: content)

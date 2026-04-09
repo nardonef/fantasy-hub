@@ -218,6 +218,29 @@ actor APIClient {
         return req
     }
 
+    /// Builds an authenticated URLRequest for the /quick combo endpoint (create thread + stream first response).
+    func quickChatRequest(leagueId: String, content: String) async throws -> URLRequest {
+        guard let url = URL(string: baseURL.absoluteString + "/leagues/\(leagueId)/chat/quick") else {
+            throw APIError.invalidResponse
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        if let token = await getAuthToken() {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let body = SendMessageRequest(content: content)
+        req.httpBody = try JSONEncoder().encode(body)
+        return req
+    }
+
+    /// Updates a thread's title (used for background AI-title refinement polling).
+    func updateThreadTitle(leagueId: String, threadId: String, title: String) async throws -> ChatThread {
+        let body: [String: Any] = ["title": title]
+        return try await request(.patch, path: "/leagues/\(leagueId)/chat/threads/\(threadId)", body: body)
+    }
+
     // MARK: - Auth Endpoints
 
     func getYahooStatus() async throws -> YahooConnectionStatus {
@@ -230,6 +253,7 @@ actor APIClient {
         case get = "GET"
         case post = "POST"
         case put = "PUT"
+        case patch = "PATCH"
         case delete = "DELETE"
     }
 
