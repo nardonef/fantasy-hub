@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SportsdataAdapter } from "../sportsdata";
-import type { PrismaClient } from "../../../../generated/prisma/client";
+import type { PrismaClient } from "../../../generated/prisma/client";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 

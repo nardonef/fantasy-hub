@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FantasyProsAdapter } from "../fantasypros";
-import type { PrismaClient } from "../../../../generated/prisma/client";
+import type { PrismaClient } from "../../../generated/prisma/client";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ const MINIMAL_PLAYER = {
   player_position_id: "QB",
   rank_ecr: 1,
   pos_rank: "QB1",
-  player_ecr_delta: null,
+  player_ecr_delta: null as number | null,
 };
 
 // ─── Unit: parseEcrData ───────────────────────────────────────────────────────
