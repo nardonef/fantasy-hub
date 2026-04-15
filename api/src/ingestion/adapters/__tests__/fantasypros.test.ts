@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { FantasyProsAdapter } from "../fantasypros";
 import type { PrismaClient } from "../../../generated/prisma/client";
 

@@ -1,6 +1,6 @@
 import type { IngestionAdapter, RawSignal } from "../types";
 import type { PrismaClient } from "../../generated/prisma/client";
-import { resolvePlayer } from "../player-resolution";
+
 
 const ECR_URL = "https://www.fantasypros.com/nfl/rankings/consensus-cheatsheets.php";
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
