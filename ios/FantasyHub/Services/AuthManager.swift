@@ -27,6 +27,17 @@ class AuthManager: ObservableObject {
     func startObservingClerk() {
         observationTask?.cancel()
         observationTask = Task { [weak self] in
+            // Simulator dev bypass: skip Clerk when SIMULATOR_DEV_AUTH env var is set
+            #if targetEnvironment(simulator)
+            if ProcessInfo.processInfo.environment["SIMULATOR_DEV_AUTH"] == "1" {
+                await MainActor.run {
+                    self?.isAuthenticated = true
+                    self?.isReady = true
+                    self?.displayName = "Dev User"
+                }
+                return
+            }
+            #endif
             // Give Clerk a moment to restore cached session
             try? await Task.sleep(for: .milliseconds(800))
             await self?.syncState()

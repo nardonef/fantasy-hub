@@ -271,6 +271,69 @@ export function startSyncWorker() {
         }
       }
 
+      // ── Sync current-season roster for all managers ──────────────────────────
+      // Runs after all season data is imported. Non-fatal if it fails.
+      if (adapter.getCurrentRoster) {
+        try {
+          const now2 = new Date();
+          const currentSeasonYear = now2.getMonth() >= 8 ? now2.getFullYear() : now2.getFullYear() - 1;
+          const currentLeagueId = seasonLeagueIds?.[currentSeasonYear] ?? providerLeagueId;
+
+          const rosterPlayers = await adapter.getCurrentRoster(credentials, currentLeagueId);
+
+          // Wipe existing roster snapshot for this league and replace entirely
+          await prisma.rosterPlayer.deleteMany({ where: { leagueId } });
+
+          const managers = await prisma.manager.findMany({
+            where: { leagueId },
+            select: { id: true, providerManagerId: true },
+          });
+          const managerMap = new Map(managers.map((m) => [m.providerManagerId, m.id]));
+
+          const syncedAt = new Date();
+
+          for (const rp of rosterPlayers) {
+            const managerId = managerMap.get(rp.managerProviderManagerId);
+            if (!managerId) continue;
+
+            // Resolve to our internal player ID
+            let playerId: string | null = null;
+            let playerName = rp.playerName ?? rp.providerPlayerId;
+
+            if (provider === "SLEEPER") {
+              // Sleeper: providerPlayerId is the Sleeper player ID — resolve via metadata.sleeperId
+              const rows = await prisma.$queryRaw<{ id: string; full_name: string }[]>`
+                SELECT id, full_name FROM players
+                WHERE metadata->>'sleeperId' = ${rp.providerPlayerId}
+                LIMIT 1
+              `;
+              if (rows[0]) {
+                playerId = rows[0].id;
+                playerName = rows[0].full_name;
+              }
+            } else {
+              // Yahoo (and future providers): providerPlayerId is the player name — resolve via case-insensitive match
+              const player = await prisma.player.findFirst({
+                where: { fullName: { equals: rp.providerPlayerId, mode: "insensitive" } },
+                select: { id: true, fullName: true },
+              });
+              if (player) {
+                playerId = player.id;
+                playerName = player.fullName;
+              }
+            }
+
+            await prisma.rosterPlayer.create({
+              data: { leagueId, managerId, playerId, playerName, slot: rp.slot, syncedAt },
+            });
+          }
+
+          console.log(`Roster sync: ${rosterPlayers.length} players stored for league ${leagueId}`);
+        } catch (err) {
+          console.error(`Roster sync failed for league ${leagueId} (non-fatal):`, err);
+        }
+      }
+
       await prisma.syncJob.update({
         where: { id: syncJobId },
         data: { status: "COMPLETED", completedAt: new Date(), syncMode: effectiveMode },

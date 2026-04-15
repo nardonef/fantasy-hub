@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Core Models
 
@@ -222,43 +223,6 @@ struct DraftPickEntry: Identifiable, Codable {
     let position: String?
 }
 
-// MARK: - Manager Profile / Career Stats
-
-struct ManagerProfile: Codable {
-    let manager: Manager
-    let seasonsPlayed: Int
-    let careerRecord: CareerRecord
-    let championships: Int
-    let playoffAppearances: Int
-    let careerPointsFor: Double
-    let careerPointsAgainst: Double
-    let bestFinish: Int?
-    let worstFinish: Int?
-    let highestScoringWeek: WeeklyScore?
-    let lowestScoringWeek: WeeklyScore?
-    let avgPointsPerGame: Double
-    let seasonResults: [SeasonResult]
-}
-
-struct CareerRecord: Codable {
-    let wins: Int
-    let losses: Int
-    let ties: Int
-}
-
-struct SeasonResult: Identifiable, Codable {
-    var id: String { "\(year)" }
-    let year: Int
-    let teamName: String
-    let finalRank: Int?
-    let wins: Int
-    let losses: Int
-    let ties: Int
-    let pointsFor: Double
-    let madePlayoffs: Bool
-    let isChampion: Bool
-}
-
 // MARK: - Recent Activity Feed
 
 struct ActivityItem: Identifiable, Codable {
@@ -321,26 +285,6 @@ enum ActivityType: String, Codable {
     case championCrowned = "CHAMPION_CROWNED"
 }
 
-// MARK: - Invite Models
-
-struct InviteResponse: Codable {
-    let inviteCode: String
-    let inviteUrl: String
-}
-
-struct InvitePreview: Codable {
-    let leagueName: String
-    let provider: Provider
-    let memberCount: Int
-    let isValid: Bool
-}
-
-struct JoinLeagueResponse: Codable, Identifiable {
-    let id: String
-    let name: String
-    let provider: Provider
-    let alreadyMember: Bool
-}
 
 // MARK: - Dashboard / Personal Stats
 
@@ -514,4 +458,179 @@ enum ChatSSEEvent {
             return nil
         }
     }
+}
+
+// MARK: - Intelligence Layer / Feed Models
+
+enum SignalSource: String, Codable, CaseIterable {
+    case reddit = "REDDIT"
+    case bluesky = "BLUESKY"
+    case sportsdata = "SPORTSDATA"
+    case fantasypros = "FANTASYPROS"
+
+    var displayName: String {
+        switch self {
+        case .reddit: "Reddit"
+        case .bluesky: "Bluesky"
+        case .sportsdata: "SportsData"
+        case .fantasypros: "FantasyPros"
+        }
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .reddit: Color(hex: 0xFF4500)
+        case .bluesky: Color(hex: 0x0085FF)
+        case .sportsdata: Color(hex: 0x9B59B6)
+        case .fantasypros: Color(hex: 0x4ADE80)
+        }
+    }
+}
+
+enum SignalType: String, Codable {
+    case rankingChange = "RANKING_CHANGE"
+    case socialMention = "SOCIAL_MENTION"
+    case statsUpdate = "STATS_UPDATE"
+    case recommendation = "RECOMMENDATION"
+
+    var displayName: String {
+        switch self {
+        case .rankingChange: "Rankings"
+        case .socialMention: "Social"
+        case .statsUpdate: "Stats"
+        case .recommendation: "Pick"
+        }
+    }
+
+    var systemIcon: String {
+        switch self {
+        case .rankingChange: "arrow.up.arrow.down"
+        case .socialMention: "bubble.left"
+        case .statsUpdate: "chart.bar.fill"
+        case .recommendation: "star.fill"
+        }
+    }
+}
+
+struct FeedPlayer: Identifiable, Codable {
+    let id: String
+    let fullName: String
+    let position: String?
+    let nflTeam: String?
+
+    var positionColor: Color {
+        switch position?.uppercased() {
+        case "QB": return Color(hex: 0xF87171)
+        case "RB": return Color(hex: 0x67E8F9)
+        case "WR": return Color(hex: 0xC9A96E)
+        case "TE": return Color(hex: 0x4ADE80)
+        case "K":  return Color(hex: 0xC084FC)
+        case "DEF": return Color(hex: 0xFB923C)
+        default:   return Color(hex: 0x8A8578)
+        }
+    }
+}
+
+struct Signal: Identifiable, Codable {
+    let id: String
+    let playerId: String
+    let source: SignalSource
+    let signalType: SignalType
+    let content: String
+    let publishedAt: Date
+    let fetchedAt: Date
+    let player: FeedPlayer
+
+    var relativeTime: String {
+        let diff = Date().timeIntervalSince(fetchedAt)
+        switch diff {
+        case ..<60: return "just now"
+        case ..<3600: return "\(Int(diff / 60))m ago"
+        case ..<86400: return "\(Int(diff / 3600))h ago"
+        default: return "\(Int(diff / 86400))d ago"
+        }
+    }
+}
+
+struct FeedResponse: Codable {
+    let signals: [Signal]
+    let nextCursor: String?
+}
+
+struct LatestSignal: Codable {
+    let id: String
+    let signalType: SignalType
+    let content: String
+    let publishedAt: Date
+    let fetchedAt: Date
+}
+
+struct RecommendationItem: Identifiable, Codable {
+    var id: String { player.id }
+    let player: FeedPlayer
+    let signalCount: Int
+    let confidence: Int
+    let sources: [String]
+    let latestSignal: LatestSignal
+}
+
+struct RecommendationsResponse: Codable {
+    let recommendations: [RecommendationItem]
+    let since: String
+}
+
+struct PlayerSignal: Identifiable, Codable {
+    let id: String
+    let source: SignalSource
+    let signalType: SignalType
+    let content: String
+    let publishedAt: Date
+    let fetchedAt: Date
+
+    var relativeTime: String {
+        let diff = Date().timeIntervalSince(fetchedAt)
+        switch diff {
+        case ..<60: return "just now"
+        case ..<3600: return "\(Int(diff / 60))m ago"
+        case ..<86400: return "\(Int(diff / 3600))h ago"
+        default: return "\(Int(diff / 86400))d ago"
+        }
+    }
+}
+
+struct PlayerDetail: Identifiable, Codable {
+    let id: String
+    let fullName: String
+    let position: String?
+    let nflTeam: String?
+    let status: String?
+    let signals: [PlayerSignal]
+
+    var positionColor: Color {
+        switch position?.uppercased() {
+        case "QB": return Color(hex: 0xF87171)
+        case "RB": return Color(hex: 0x67E8F9)
+        case "WR": return Color(hex: 0xC9A96E)
+        case "TE": return Color(hex: 0x4ADE80)
+        case "K":  return Color(hex: 0xC084FC)
+        case "DEF": return Color(hex: 0xFB923C)
+        default:   return Color(hex: 0x8A8578)
+        }
+    }
+}
+
+struct PlayerDetailResponse: Codable {
+    let player: PlayerDetail
+}
+
+struct PlayerSearchResult: Identifiable, Codable {
+    let id: String
+    let fullName: String
+    let position: String?
+    let nflTeam: String?
+    let status: String?
+}
+
+struct PlayerSearchResponse: Codable {
+    let players: [PlayerSearchResult]
 }

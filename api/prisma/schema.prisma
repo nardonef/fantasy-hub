@@ -65,10 +65,11 @@ model League {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  seasons      Season[]
-  members      LeagueMember[]
-  managers     Manager[]
-  chatThreads  ChatThread[]
+  seasons       Season[]
+  members       LeagueMember[]
+  managers      Manager[]
+  chatThreads   ChatThread[]
+  rosterPlayers RosterPlayer[]
 
   @@unique([provider, providerLeagueId])
   @@map("leagues")
@@ -113,6 +114,7 @@ model Manager {
   awayMatchups  Matchup[]       @relation("AwayManager")
   draftPicks    DraftPick[]
   transactions  Transaction[]
+  rosterPlayers RosterPlayer[]
 
   @@unique([leagueId, providerManagerId])
   @@map("managers")
@@ -283,6 +285,106 @@ enum SyncStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+// ─── Roster ──────────────────────────────────────────────────
+
+model RosterPlayer {
+  id         String   @id @default(cuid())
+  leagueId   String   @map("league_id")
+  managerId  String   @map("manager_id")
+  playerId   String?  @map("player_id")   // null if player couldn't be resolved to our players table
+  playerName String   @map("player_name") // canonical name (resolved from provider)
+  slot       String?  // STARTER | BENCH | IR | TAXI
+  syncedAt   DateTime @map("synced_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  league  League  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  manager Manager @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  player  Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([leagueId, managerId])
+  @@index([leagueId, playerId])
+  @@map("roster_players")
+}
+
+// ─── Intelligence Layer ──────────────────────────────────────
+
+model Player {
+  id        String   @id @default(cuid())
+  fullName  String   @map("full_name")
+  position  String?  // QB, RB, WR, TE, K, DEF
+  nflTeam   String?  @map("nfl_team")
+  status    String   @default("active") // active, injured, ir, inactive
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  aliases       PlayerNameAlias[]
+  signals       Signal[]
+  rosterPlayers RosterPlayer[]
+
+  @@unique([fullName])
+  @@map("players")
+}
+
+model PlayerNameAlias {
+  id        String   @id @default(cuid())
+  playerId  String   @map("player_id")
+  alias     String   // raw name variant, e.g. "P. Mahomes"
+  source    String   // which ingestion source produced this alias
+  createdAt DateTime @default(now()) @map("created_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([alias])
+  @@index([alias])
+  @@map("player_name_aliases")
+}
+
+enum SignalSource {
+  REDDIT
+  BLUESKY
+  SPORTSDATA
+  FANTASYPROS
+}
+
+enum SignalType {
+  RANKING_CHANGE  // ECR rank moved
+  SOCIAL_MENTION  // Reddit/Bluesky post
+  STATS_UPDATE    // SportsDataIO weekly stats
+  RECOMMENDATION  // computed start/sit/add/drop
+}
+
+model Signal {
+  id          String       @id @default(cuid())
+  playerId    String       @map("player_id")
+  source      SignalSource
+  signalType  SignalType   @map("signal_type")
+  content     String       @db.Text
+  metadata    Json?        // upvotes, author, rank delta, confidence, etc.
+  publishedAt DateTime     @map("published_at")
+  fetchedAt   DateTime     @default(now()) @map("fetched_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, publishedAt])
+  @@index([source, fetchedAt])
+  @@map("signals")
+}
+
+model IngestionJob {
+  id             String       @id @default(cuid())
+  source         SignalSource
+  status         SyncStatus   @default(PENDING)
+  lastRunAt      DateTime?    @map("last_run_at")
+  nextRunAt      DateTime?    @map("next_run_at")
+  recordsFetched Int          @default(0) @map("records_fetched")
+  error          String?
+  metadata       Json?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@map("ingestion_jobs")
 }
 
 // ─── AI Chat ─────────────────────────────────────────────────

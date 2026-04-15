@@ -5,6 +5,8 @@ import type {
   ProviderManager,
   ProviderMatchup,
   ProviderDraftPick,
+  ProviderRosterPlayer,
+  RosterSlot,
 } from "./types";
 
 const SLEEPER_API = "https://api.sleeper.app/v1";
@@ -40,7 +42,11 @@ interface SleeperUser {
 
 interface SleeperRoster {
   roster_id: number;
-  owner_id: string;
+  owner_id: string | null;
+  players: string[] | null;   // all player IDs on the roster
+  starters: string[] | null;  // player IDs in the starting lineup
+  reserve: string[] | null;   // player IDs on IR
+  taxi: string[] | null;      // player IDs on taxi squad (dynasty)
   settings: { wins: number; losses: number; ties: number; fpts: number; fpts_decimal?: number; fpts_against?: number; fpts_against_decimal?: number };
 }
 
@@ -147,23 +153,26 @@ export const sleeperAdapter: ProviderAdapter = {
     const rosterToUser = new Map<number, SleeperUser>();
     const rosterToOwnerId = new Map<number, string>();
     for (const roster of rosters) {
+      if (!roster.owner_id) continue; // skip orphaned slots with no owner
       rosterToOwnerId.set(roster.roster_id, roster.owner_id);
       const user = users.find((u) => u.user_id === roster.owner_id);
       if (user) rosterToUser.set(roster.roster_id, user);
     }
 
-    // Build managers
-    const managers: ProviderManager[] = rosters.map((roster) => {
-      const user = rosterToUser.get(roster.roster_id);
-      return {
-        providerManagerId: roster.owner_id,
-        name: user?.display_name ?? `Team ${roster.roster_id}`,
-        avatarUrl: user?.avatar
-          ? `https://sleepercdn.com/avatars/thumbs/${user.avatar}`
-          : null,
-        teamName: user?.display_name ?? `Team ${roster.roster_id}`,
-      };
-    });
+    // Build managers (skip rosters with no owner)
+    const managers: ProviderManager[] = rosters
+      .filter((r) => r.owner_id !== null)
+      .map((roster) => {
+        const user = rosterToUser.get(roster.roster_id);
+        return {
+          providerManagerId: roster.owner_id as string,
+          name: user?.display_name ?? `Team ${roster.roster_id}`,
+          avatarUrl: user?.avatar
+            ? `https://sleepercdn.com/avatars/thumbs/${user.avatar}`
+            : null,
+          teamName: user?.display_name ?? `Team ${roster.roster_id}`,
+        };
+      });
 
     // Fetch matchups for all weeks (NFL regular season = 14-18 weeks)
     const matchups: ProviderMatchup[] = [];
@@ -210,9 +219,11 @@ export const sleeperAdapter: ProviderAdapter = {
       position: pick.metadata?.position ?? null,
     }));
 
-    // Build standings from roster settings
-    const standings = rosters.map((roster) => ({
-      managerProviderManagerId: roster.owner_id,
+    // Build standings from roster settings (skip orphaned rosters with no owner)
+    const standings = rosters
+      .filter((r) => r.owner_id !== null)
+      .map((roster) => ({
+      managerProviderManagerId: roster.owner_id as string,
       rank: 0, // will be calculated after sorting
       wins: roster.settings.wins,
       losses: roster.settings.losses,
@@ -263,5 +274,35 @@ export const sleeperAdapter: ProviderAdapter = {
       standings,
       championManagerId,
     };
+  },
+
+  async getCurrentRoster(_credentials, leagueId): Promise<ProviderRosterPlayer[]> {
+    const rosters = await sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`);
+    const result: ProviderRosterPlayer[] = [];
+
+    for (const roster of rosters) {
+      // Skip orphaned roster slots with no owner (happens during offseason or when a manager leaves)
+      if (!roster.owner_id) continue;
+
+      const starterSet = new Set(roster.starters ?? []);
+      const reserveSet = new Set(roster.reserve ?? []);
+      const taxiSet    = new Set(roster.taxi ?? []);
+
+      for (const sleeperId of roster.players ?? []) {
+        let slot: RosterSlot;
+        if (starterSet.has(sleeperId))     slot = "STARTER";
+        else if (reserveSet.has(sleeperId)) slot = "IR";
+        else if (taxiSet.has(sleeperId))    slot = "TAXI";
+        else                                slot = "BENCH";
+
+        result.push({
+          managerProviderManagerId: roster.owner_id,
+          providerPlayerId: sleeperId,
+          slot,
+        });
+      }
+    }
+
+    return result;
   },
 };

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 18: Recommendations Card Design — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.visual { background: #fce7f3; color: #be185d; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 220px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 18 of 28</span>
+    <h1>Recommendations Card Design</h1>
+    <span class="category-badge visual">Visual</span>
+    <p class="decision-description">
+      Your feed will mix social posts, ranking changes, and recommendation signals — but not all signals are equal. A consensus top waiver pickup backed by 3 sources is very different from a speculative Reddit hot take. This decision is about how a recommendation card communicates what it knows, how confident it is, and what the user should do about it. The card needs to fit cleanly in the unified stream alongside other card types while still giving users enough signal to act.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option B but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- Option A: Urgency-First -->
+    <article class="option-card option-a not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Urgency-First</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%;max-width:300px;font-family:-apple-system,system-ui,sans-serif;display:flex;flex-direction:column;gap:8px">
+          <!-- High urgency card -->
+          <div style="background:#1A1A1A;border-radius:10px;overflow:hidden;border-left:3px solid #F87171">
+            <div style="padding:8px 10px 0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <span style="background:#F87171;color:white;font-size:0.5rem;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:0.05em;text-transform:uppercase">🔴 Act Now</span>
+                <span style="color:#888;font-size:0.55rem">2h ago</span>
+              </div>
+              <div style="font-size:0.75rem;font-weight:700;color:#E8E2D6">Add Jaylen Warren</div>
+              <div style="font-size:0.6rem;color:#999;margin-top:1px">Najee Harris (hamstring) — questionable</div>
+            </div>
+            <div style="padding:6px 10px 8px;display:flex;gap:6px">
+              <span style="font-size:0.55rem;color:#aaa;background:#2a2a2a;padding:2px 6px;border-radius:4px">FantasyPros #3 waiver</span>
+              <span style="font-size:0.55rem;color:#aaa;background:#2a2a2a;padding:2px 6px;border-radius:4px">Reddit ↑ 847</span>
+            </div>
+          </div>
+          <!-- Low urgency card -->
+          <div style="background:#1A1A1A;border-radius:10px;overflow:hidden;border-left:3px solid #FBBF24">
+            <div style="padding:8px 10px 0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <span style="background:#FBBF24;color:#1A1A1A;font-size:0.5rem;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:0.05em;text-transform:uppercase">👀 Watch</span>
+                <span style="color:#888;font-size:0.55rem">6h ago</span>
+              </div>
+              <div style="font-size:0.75rem;font-weight:700;color:#E8E2D6">Monitor Bijan Robinson</div>
+              <div style="font-size:0.6rem;color:#999;margin-top:1px">ATL scheming more screens this week</div>
+            </div>
+            <div style="padding:6px 10px 8px">
+              <span style="font-size:0.55rem;color:#aaa;background:#2a2a2a;padding:2px 6px;border-radius:4px">Bluesky: @matthewberry</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Every card leads with an urgency label — red "Act Now", yellow "Watch", or grey "FYI" — determined by how time-sensitive the underlying signal is (injury news = Act Now, OTA report = FYI). The border color mirrors the urgency. Users who scan the feed quickly can filter by color without reading the content. Good for a pre-game window when urgency is everything, but the labels can feel alarmist for routine signals.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Users check the feed close to game time when urgency matters most</li>
+            <li>Color coding lets you scan 10 cards in 3 seconds</li>
+            <li>Injury news needs to be surfaced immediately above everything else</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>"Act Now" labels go stale — a Wednesday injury alert is not urgent on Sunday</li>
+            <li>Everything feels urgent when there's a lot of news — label inflation</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Confidence-Scored -->
+    <article class="option-card option-b chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Confidence-Scored</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%;max-width:300px;font-family:-apple-system,system-ui,sans-serif;display:flex;flex-direction:column;gap:8px">
+          <!-- High confidence card -->
+          <div style="background:#1A1A1A;border-radius:10px;overflow:hidden;border-left:3px solid #C9A96E">
+            <div style="padding:8px 10px 6px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <div style="display:flex;gap:3px;align-items:center">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#4ADE80"></div>
+                  <div style="width:8px;height:8px;border-radius:50%;background:#4ADE80"></div>
+                  <div style="width:8px;height:8px;border-radius:50%;background:#4ADE80"></div>
+                  <span style="font-size:0.55rem;color:#4ADE80;font-weight:700;margin-left:3px">Strong signal</span>
+                </div>
+                <span style="color:#888;font-size:0.55rem">3 sources</span>
+              </div>
+              <div style="font-size:0.75rem;font-weight:700;color:#E8E2D6">Start: Jaylen Warren</div>
+              <div style="font-size:0.6rem;color:#999;margin-top:2px">Consensus RB2 this week · FantasyPros, Reddit, SportsDataIO</div>
+            </div>
+          </div>
+          <!-- Low confidence card -->
+          <div style="background:#1A1A1A;border-radius:10px;overflow:hidden;border-left:3px solid #444">
+            <div style="padding:8px 10px 6px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <div style="display:flex;gap:3px;align-items:center">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#FBBF24"></div>
+                  <div style="width:8px;height:8px;border-radius:50%;background:#333"></div>
+                  <div style="width:8px;height:8px;border-radius:50%;background:#333"></div>
+                  <span style="font-size:0.55rem;color:#FBBF24;font-weight:700;margin-left:3px">Speculative</span>
+                </div>
+                <span style="color:#888;font-size:0.55rem">1 source</span>
+              </div>
+              <div style="font-size:0.75rem;font-weight:700;color:#E8E2D6">Waiver Buzz: Ty Chandler</div>
+              <div style="font-size:0.6rem;color:#999;margin-top:2px">Reddit hot take · one analyst mention</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Each card displays a confidence score — 3 green dots (strong consensus across multiple sources) down to 1 yellow dot (single-source speculation). The score is computed from how many independent sources agree and how authoritative they are (FantasyPros consensus = more weight than a single Reddit post). This is the most honest design: it directly communicates the difference between "everyone agrees" and "one guy on Reddit thinks." I recommend this because it lets users make their own risk calls rather than the app pretending it knows what's urgent.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Signal quality varies wildly — 3-source consensus vs single hot take need different treatment</li>
+            <li>Users want to make their own calls, not just follow instructions</li>
+            <li>Source diversity grows over time — the score naturally improves as you add sources</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Confidence scoring logic needs to be tuned — bad weights produce misleading scores</li>
+            <li>Dot indicator may not be intuitive to all users on first look</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Action-Oriented -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Action-Oriented</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%;max-width:300px;font-family:-apple-system,system-ui,sans-serif;display:flex;flex-direction:column;gap:8px">
+          <!-- Start card -->
+          <div style="background:#1A1A1A;border-radius:10px;overflow:hidden;border-left:3px solid #4ADE80">
+            <div style="padding:8px 10px">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                <div>
+                  <div style="font-size:0.75rem;font-weight:700;color:#E8E2D6">Amon-Ra St. Brown</div>
+                  <div style="font-size:0.6rem;color:#999;margin-top:2px">WR2 this week · matchup vs CHI</div>
+                  <div style="font-size:0.55rem;color:#888;margin-top:4px">FantasyPros · Bluesky · 4h ago</div>
+                </div>
+                <button style="background:#4ADE80;color:#1A1A1A;border:none;border-radius:7px;padding:6px 10px;font-size:0.6rem;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0">▶ START</button>
+              </div>
+            </div>
+          </div>
+          <!-- Add card -->
+          <div style="background:#1A1A1A;border-radius:10px;overflow:hidden;border-left:3px solid #C9A96E">
+            <div style="padding:8px 10px">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                <div>
+                  <div style="font-size:0.75rem;font-weight:700;color:#E8E2D6">Jaylen Warren</div>
+                  <div style="font-size:0.6rem;color:#999;margin-top:2px">#3 waiver · Najee questionable</div>
+                  <div style="font-size:0.55rem;color:#888;margin-top:4px">FantasyPros · Reddit · 2h ago</div>
+                </div>
+                <button style="background:#C9A96E;color:#1A1A1A;border:none;border-radius:7px;padding:6px 10px;font-size:0.6rem;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0">+ ADD</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Every recommendation card has an explicit action button — Start, Sit, Add, or Drop — positioned on the right edge of the card. The button color maps to the action type (green for positive, red for drop). This is the most opinionated design: the app decides what you should do and puts a button on it. It creates a direct path from "I see the recommendation" to "I took action." The tradeoff is that the app is making a judgment call the user might not agree with.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Users want to act quickly — one tap from recommendation to decision</li>
+            <li>The recommendation logic is solid enough to earn user trust</li>
+            <li>Clear action hierarchy (Start &gt; Add &gt; Sit &gt; Drop) is well defined</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Buttons imply the app has roster access — requires provider OAuth integration</li>
+            <li>Wrong recommendations feel much worse when the UI says "do this"</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Minimal Inline -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Minimal Inline</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%;max-width:300px;font-family:-apple-system,system-ui,sans-serif;display:flex;flex-direction:column;gap:6px">
+          <!-- Minimal recommendation row -->
+          <div style="background:#1A1A1A;border-radius:10px;padding:9px 12px;border-left:3px solid #C9A96E">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:0.6rem;font-weight:700;color:#C9A96E;text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0">Start</span>
+              <span style="font-size:0.75rem;font-weight:600;color:#E8E2D6;flex:1">Jaylen Warren</span>
+              <span style="font-size:0.55rem;color:#888">FantasyPros · 2h</span>
+            </div>
+          </div>
+          <!-- Another minimal row -->
+          <div style="background:#1A1A1A;border-radius:10px;padding:9px 12px;border-left:3px solid #4ADE80">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:0.6rem;font-weight:700;color:#4ADE80;text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0">Add</span>
+              <span style="font-size:0.75rem;font-weight:600;color:#E8E2D6;flex:1">Ty Chandler</span>
+              <span style="font-size:0.55rem;color:#888">Reddit · 4h</span>
+            </div>
+          </div>
+          <!-- Ranking change row for comparison -->
+          <div style="background:#1A1A1A;border-radius:10px;padding:9px 12px;border-left:3px solid #0085FF">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:0.6rem;font-weight:700;color:#0085FF;text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0">↑3</span>
+              <span style="font-size:0.75rem;font-weight:600;color:#E8E2D6;flex:1">St. Brown → WR2</span>
+              <span style="font-size:0.55rem;color:#888">ECR · 6h</span>
+            </div>
+          </div>
+          <div style="font-size:0.55rem;color:#666;text-align:center;margin-top:2px">Recommendation rows blend with ranking change rows</div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Recommendation cards use the same compact single-row format as ranking change cards and social snippets — just a colored action label, player name, and source. No extra chrome, no buttons, no urgency theatrics. This design prioritizes stream density over individual card expressiveness. You see more signals per scroll, and the feed feels cohesive rather than having recommendation cards stand out as a different UI element. The tradeoff is that each card communicates less — there's no room for context or confidence signals.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Feed density matters — pack more signals into the same screen height</li>
+            <li>You want a visually cohesive stream where all cards feel like siblings</li>
+            <li>Users are familiar enough with fantasy to need just a name + action</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>No confidence or context visible — every signal looks equally credible</li>
+            <li>Thin cards feel low-value compared to richer social post cards in the same feed</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a">A: Urgency-First</th>
+            <th class="col-b col-recommended">B: Confidence-Scored</th>
+            <th class="col-c">C: Action-Oriented</th>
+            <th class="col-d">D: Minimal Inline</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Primary signal communicated</td>
+            <td>Time sensitivity</td>
+            <td class="col-recommended">Source consensus strength</td>
+            <td>Recommended action</td>
+            <td>Player name + action label</td>
+          </tr>
+          <tr>
+            <td>Context per card</td>
+            <td>Medium — urgency + sources</td>
+            <td class="col-recommended">High — confidence + sources</td>
+            <td>Medium — action + source</td>
+            <td>Low — name + label only</td>
+          </tr>
+          <tr>
+            <td>Handles varying signal quality</td>
+            <td>Partially — urgency ≠ quality</td>
+            <td class="col-recommended">Yes — explicitly scored</td>
+            <td>No — all cards look equal</td>
+            <td>No — all cards look equal</td>
+          </tr>
+          <tr>
+            <td>Card height in feed</td>
+            <td>Medium</td>
+            <td class="col-recommended">Medium</td>
+            <td>Medium</td>
+            <td>Compact</td>
+          </tr>
+          <tr>
+            <td>Requires external integration</td>
+            <td>No</td>
+            <td class="col-recommended">No</td>
+            <td>Yes (roster actions)</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Risk of misleading users</td>
+            <td>High (label inflation)</td>
+            <td class="col-recommended">Low (honest scoring)</td>
+            <td>Medium (wrong CTA)</td>
+            <td>Medium (no context)</td>
+          </tr>
+          <tr>
+            <td>Build complexity</td>
+            <td>Low</td>
+            <td class="col-recommended">Medium (scoring logic)</td>
+            <td>High (roster API)</td>
+            <td>Low</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option B but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-017 I want Option B instead"</strong></p>
+  </div>
+</body>
+</html>

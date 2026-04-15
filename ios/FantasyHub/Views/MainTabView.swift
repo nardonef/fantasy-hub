@@ -19,7 +19,7 @@ struct MainTabView: View {
     @State private var isTabBarVisible = true
 
     enum Tab: String {
-        case dashboard, analytics, chat, league, profile
+        case dashboard, analytics, feed, chat, profile
     }
 
     init() {
@@ -38,11 +38,11 @@ struct MainTabView: View {
                 AnalyticsView()
                     .tag(Tab.analytics)
 
+                FeedView()
+                    .tag(Tab.feed)
+
                 ChatLandingView()
                     .tag(Tab.chat)
-
-                LeagueView()
-                    .tag(Tab.league)
 
                 ProfileView()
                     .tag(Tab.profile)
@@ -100,8 +100,8 @@ struct CustomTabBar: View {
     private let tabs: [(MainTabView.Tab, String, String)] = [
         (.dashboard, "Dashboard", "rectangle.3.group"),
         (.analytics, "Analytics", "chart.bar.xaxis"),
+        (.feed, "Intel", "antenna.radiowaves.left.and.right"),
         (.chat, "AI Chat", "bubble.left.and.text.bubble.right"),
-        (.league, "League", "person.3"),
         (.profile, "Profile", "person.crop.circle"),
     ]
 

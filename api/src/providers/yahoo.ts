@@ -6,6 +6,8 @@ import type {
   ProviderMatchup,
   ProviderDraftPick,
   ProviderTransaction,
+  ProviderRosterPlayer,
+  RosterSlot,
 } from "./types";
 
 /**
@@ -524,5 +526,118 @@ export const yahooAdapter: ProviderAdapter = {
       standings,
       championManagerId,
     };
+  },
+
+  async getCurrentRoster(credentials, leagueId): Promise<ProviderRosterPlayer[]> {
+    const { accessToken } = credentials;
+    const data = await yahooFetch<any>(`/league/${leagueId}/teams;out=roster`, accessToken);
+
+    const result: ProviderRosterPlayer[] = [];
+
+    try {
+      const league = data.fantasy_content.league;
+      const teamsWrapper = league[1]?.teams;
+      if (!teamsWrapper) return result;
+
+      const teamCount = typeof teamsWrapper.count === "number" ? teamsWrapper.count : 0;
+
+      for (let i = 0; i < teamCount; i++) {
+        const teamEntry = teamsWrapper[String(i)];
+        if (!teamEntry?.team) continue;
+
+        const teamInfo = teamEntry.team[0];
+        const rosterWrapper = teamEntry.team[1]?.roster;
+        if (!rosterWrapper) continue;
+
+        // Extract manager identity key using same parsing logic as getSeasonData
+        let slotId = "";
+        let managerNickname = "";
+        let managerEmail = "";
+
+        for (const item of teamInfo ?? []) {
+          if (Array.isArray(item)) {
+            for (const sub of item) {
+              if (sub?.managers) {
+                const mgr = sub.managers[0]?.manager;
+                if (mgr) {
+                  slotId = String(mgr.manager_id ?? "");
+                  managerNickname = mgr.nickname ?? "";
+                  managerEmail = mgr.email ?? "";
+                }
+              }
+            }
+          } else if (typeof item === "object" && item?.managers) {
+            const mgr = item.managers[0]?.manager;
+            if (mgr) {
+              slotId = String(mgr.manager_id ?? "");
+              managerNickname = mgr.nickname ?? "";
+              managerEmail = mgr.email ?? "";
+            }
+          }
+        }
+
+        // Build the same identity key used during season sync so manager lookup works
+        const isHidden = !managerNickname || managerNickname === "--hidden--";
+        let identityKey: string;
+        if (!isHidden) {
+          identityKey = managerNickname.toLowerCase();
+        } else if (managerEmail) {
+          identityKey = managerEmail.toLowerCase();
+        } else {
+          identityKey = `anon-${slotId}`;
+        }
+
+        // Parse roster players
+        const playersWrapper = rosterWrapper.players ?? rosterWrapper["0"]?.players;
+        if (!playersWrapper) continue;
+
+        const playerCount = typeof playersWrapper.count === "number" ? playersWrapper.count : 0;
+
+        for (let p = 0; p < playerCount; p++) {
+          const playerEntry = playersWrapper[String(p)];
+          if (!playerEntry?.player) continue;
+
+          const playerInfo = playerEntry.player[0];
+          const playerMeta = playerEntry.player[1];
+
+          // Extract player name from nested metadata array
+          let playerName = "";
+          for (const item of playerInfo ?? []) {
+            if (typeof item === "object" && item?.name) {
+              playerName = item.name.full ?? (item.name.ascii_first ?? "") + " " + (item.name.ascii_last ?? "");
+              break;
+            }
+          }
+          if (!playerName) continue;
+
+          // Determine slot from selected_position
+          let slot: RosterSlot = "BENCH";
+          const selectedPosition = playerMeta?.selected_position;
+          if (selectedPosition) {
+            // selected_position is [{coverage_type, week/date}, {position: "QB"}]
+            for (const sp of Array.isArray(selectedPosition) ? selectedPosition : []) {
+              if (sp?.position) {
+                const pos = String(sp.position).toUpperCase();
+                if (pos === "IR") slot = "IR";
+                else if (pos === "BN") slot = "BENCH";
+                else slot = "STARTER"; // QB, RB, WR, TE, K, DEF, W/R, W/R/T, etc.
+                break;
+              }
+            }
+          }
+
+          result.push({
+            managerProviderManagerId: identityKey,
+            providerPlayerId: playerName, // Yahoo: use name as the identifier
+            playerName,
+            slot,
+          });
+        }
+      }
+    } catch {
+      // Yahoo's nested JSON is fragile — return what we have
+    }
+
+    return result;
   },
 };

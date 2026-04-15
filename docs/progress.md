@@ -1,8 +1,8 @@
 # Fantasy League Hub — Progress Tracker
 
-> **Last updated**: 2026-04-02
-> **Current phase**: V2 — AI Chat (complete, pending iOS end-to-end test with real auth)
-> **Goal**: ChatGPT-style natural language interface for league history, scoped to a single league
+> **Last updated**: 2026-04-13
+> **Current phase**: V2b — Intelligence Layer (active, post-QA enhancements)
+> **Goal**: Intelligence feed layer with signals from Reddit, FantasyPros, SportsDataIO; Feed/Picks tabs; player search and detail
 
 ---
 
@@ -154,8 +154,14 @@
 - [x] Fix year display formatting — no comma separators (2025 not 2,025)
 - [x] Fix native tab bar bleeding through behind custom tab bar
 - [x] Shimmer/skeleton loading states (ShimmerView + DashboardSkeleton, AnalyticsSkeleton, StandingsSkeleton, GenericListSkeleton)
-- [ ] App Store assets and submission
-- [ ] TestFlight beta
+- [ ] Production deployment — see blockers below before starting
+  - [ ] Replace hardcoded `http://localhost:3000/api` in `APIClient.swift` with build-config-driven URL (Debug vs Release xcconfig)
+  - [ ] Remove self-signed HTTPS server on port 3443 in `server.ts`; use TLS termination at load balancer instead
+  - [ ] Update `YAHOO_REDIRECT_URI` and Yahoo developer console to production domain
+  - [ ] Obtain missing credentials: `REDDIT_CLIENT_ID/SECRET`, `SPORTSDATA_API_KEY`, Clerk production keys
+  - [ ] Choose infra stack (Railway/Render recommended: managed Postgres + Redis, auto-deploy from GitHub)
+  - [ ] Run `prisma migrate deploy` against production DB
+  - [ ] Apple Developer account + App Store Connect setup, TestFlight, App Store review
 
 ### 10. Documentation & Tooling ✅ COMPLETE
 
@@ -224,9 +230,103 @@
 - [ ] Manager profile sharing
 - [ ] Manager identity merging / alias system
 
+## V2b — Intelligence Layer / Social Feed (planned, not started)
+
+> All decisions made (013–019). Build order: API ingestion jobs → Prisma schema → player resolution → iOS feed tab → player detail view.
+
+### Decisions (013–019)
+- [x] Decision 013 — Ingestion Data Model: Typed Signal Family (`Signal`, `Player`, `PlayerNameAlias`, `IngestionJob` tables)
+- [x] Decision 014 — Data Source APIs: Free stack (Reddit OAuth, Bluesky AT Protocol, SportsDataIO free tier, FantasyPros scraping)
+- [x] Decision 015 — Player Resolution: Alias Table + Exact-First (Levenshtein ≤ 2, self-building `PlayerNameAlias` cache)
+- [x] Decision 016 — Navigation Integration: Add Sixth Tab (Feed tab housing Feed, Recommendations, Player Detail)
+- [x] Decision 017 — Feed View Design: Unified Card Stream (single chronological list, source color-coded left borders, filter chips)
+- [x] Decision 018 — Recommendations Card Design: Confidence-Scored (3-dot signal strength indicator, source count, speculative vs consensus)
+- [x] Decision 019 — Player Detail Layout: Stats Hero + Signal Feed (sticky stats block, chronological signal feed scrolls below)
+
+### 1. Data Layer — Prisma Schema & Ingestion
+- [x] Prisma schema: `Player`, `PlayerNameAlias`, `Signal`, `IngestionJob` tables + `SignalSource`/`SignalType` enums (`prisma db push` applied)
+- [x] Prisma client regenerated
+- [x] Ingestion adapter interface (`src/ingestion/types.ts`) — `RawSignal`, `IngestionAdapter`
+- [x] Player resolution pipeline (`src/ingestion/player-resolution.ts`) — alias exact lookup → case-insensitive exact → Levenshtein ≤ 2 → null
+- [x] Reddit ingestion adapter (`src/ingestion/adapters/reddit.ts`) — OAuth client credentials, r/fantasyfootball + r/DynastyFF + r/NFLFantasy, player name extraction via ngram resolution, dedup via stored post IDs
+- [x] `ingest-signals` BullMQ job + worker (`src/jobs/ingest-signals.ts`) — runs all adapters, persists resolved signals, tracks `IngestionJob` status
+- [x] Cron schedule wired in `server.ts` (6am/6pm daily, only starts if `REDDIT_CLIENT_ID` set)
+- [x] Test infrastructure: Vitest + @vitest/coverage-v8, `npm test` script, dotenv setup for integration tests
+- [x] Tests: `levenshtein` unit (8 cases), `resolvePlayer` integration (6 cases, real DB), `RedditAdapter` unit — player extraction + dedup (7 cases) — **21/21 passing**
+- [ ] Add `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` to `api/.env` (create OAuth app at reddit.com/prefs/apps)
+- [x] Seed `Player` table with current NFL roster — `scripts/seed-players.ts` via Sleeper public API, 3090 players, position picks first fantasy-relevant value (handles two-way players like Travis Hunter)
+- [x] Tests: seed eligibility filter (6 unit), DB state post-seed (5 integration) — **32/32 passing across all test files**
+- [ ] Build Bluesky ingestion adapter (`src/ingestion/adapters/bluesky.ts`)
+- [x] Build SportsDataIO ingestion adapter (`src/ingestion/adapters/sportsdata.ts`) — weekly `PlayerGameStatsByWeek` stats; ≥5 PPR pt threshold; dedup by `playerId:season:week`; guarded by `SPORTSDATA_API_KEY` env var; offseason-safe (skips week 0 / week > 18)
+- [x] Tests: `buildContent` QB/WR/RB/edge (7 unit), `hasFantasyRelevantStats` (4 unit), `fetchSignals` offseason/dedup/threshold/error (6 unit) — **62/62 passing across all test files**
+- [x] Build FantasyPros scraping adapter (`src/ingestion/adapters/fantasypros.ts`) — scrapes `var ecrData` JSON from ECR page; deduplication via `player_id:date` key; registered in `ingest-signals.ts`; cron always scheduled (no credentials needed)
+- [x] Tests: FantasyPros `parseEcrData` (5 unit), `buildContent` (4 unit), `fetchSignals` dedup + error (3 unit) — **44/44 passing across all test files**
+
+### 2. API — Feed & Player Endpoints
+- [x] `GET /api/leagues/:leagueId/feed` — cursor-paginated signal stream; filters: source, type, playerId, limit; joined player data
+- [x] `GET /api/leagues/:leagueId/feed` — added `myRosterOnly=true` filter (Sleeper league roster via public API; Redis-cached 1h; falls back to all-players for Yahoo leagues)
+- [x] `GET /api/leagues/:leagueId/feed` — added `position=QB|RB|WR|TE|K|DEF` filter
+- [x] `GET /api/leagues/:leagueId/recommendations` — top players by signal activity (last 7 days); confidence = distinct source count
+- [x] `GET /api/players/search?q=` — case-insensitive name search, min 2 chars, max 10 results
+- [x] `GET /api/players/:playerId` — player profile + 50 most recent signals ordered by publishedAt
+- [x] Tests: feed (19 integration, including position + myRosterOnly), recommendations (4), search (6), player detail (4) — **90/90 passing across all test files**
+- [x] Backfilled `sleeperId` into `players.metadata` — `scripts/seed-players.ts` now stores Sleeper player IDs; re-run is idempotent
+- [x] `roster_players` table — Prisma schema + `prisma db push` applied; stores current-season roster per manager with slot (STARTER/BENCH/IR/TAXI) and FK to `players`
+- [x] `ProviderRosterPlayer` interface + optional `getCurrentRoster()` on `ProviderAdapter`
+- [x] Sleeper adapter `getCurrentRoster()` — reads `/league/{id}/rosters`, assigns slots from `starters`/`reserve`/`taxi` arrays
+- [x] Yahoo adapter `getCurrentRoster()` — reads `/league/{id}/teams;out=roster`, parses `selected_position` for slot, uses existing manager identity key resolution
+- [x] Sync job (`sync-league.ts`) — calls `getCurrentRoster()` after all seasons are imported; wipes and replaces roster snapshot; resolves Sleeper player IDs via `metadata.sleeperId`, Yahoo via name match; non-fatal if it fails
+- [x] `src/lib/roster.ts` — rewritten to read from `roster_players` DB table; no live API calls; returns null if roster not yet synced (graceful fallback to all players)
+
+### 3. iOS — Feed Tab (6th Tab)
+- [x] Add Intel tab (6th) to custom tab bar — `antenna.radiowaves.left.and.right` icon
+- [x] `FeedView` — unified card stream with Feed/Picks segment picker; source + type filter chips (horizontal scroll); cursor-based infinite scroll; empty states
+- [x] `SignalCard` — left border color-coded by source; position pill; source badge + relative time
+- [x] `RecommendationCard` — 4-dot confidence meter (distinct source count); source chips; taps to PlayerDetailView
+- [x] `FeedFilterChip` — active/inactive states with tint color; icon support
+- [x] `PlayerSearchView` — debounced name search via `/api/players/search`; results list with position circles
+- [x] `PlayerDetailView` — position circle hero; signal count; chronological `PlayerSignalRow` feed; skeleton loading
+- [x] Feed models added to `LeagueModels.swift`: `Signal`, `FeedPlayer`, `FeedResponse`, `RecommendationItem`, `LatestSignal`, `PlayerDetail`, `PlayerSignal`, `PlayerSearchResult`, `SignalSource`, `SignalType` enums
+- [x] Feed/player API methods added to `APIClient.swift`: `getFeed`, `getRecommendations`, `searchPlayers`, `getPlayer`
+- [x] `getFeed` updated with `position` and `myRosterOnly` params
+- [x] `FeedView`: "My Roster" toggle chip (default on); QB/RB/WR/TE/K position chips; both wired to feed reload
+- [x] `xcodegen generate` run; `BUILD SUCCEEDED`
+
+### 4. QA — Simulator Validation ✅ COMPLETE
+- [x] Feed tab renders with live seeded signals (Reddit + FantasyPros + SportsData)
+- [x] Filter chips: Rankings → only RANKING_CHANGE signals; Social → only SOCIAL_MENTION signals; All → resets
+- [x] Signal card tap → PlayerDetailView (correct position badge, signal count, signal rows with source colors)
+- [x] Back navigation from PlayerDetailView → Feed
+- [x] Picks tab: RecommendationCard with 3-dot confidence meter + source chips (Reddit/FantasyPros/SportsData)
+- [x] Search icon → PlayerSearchView with debounced search
+- [x] Player search results → PlayerDetailView (Lamar Jackson with 0 signals empty state)
+- [x] Back navigation from PlayerDetailView → PlayerSearchView
+
+### 5. V2 Social Phase (post-AI chat)
+- [ ] Weekly recap narrative generation (AI-powered, reuses chat LLM infrastructure)
+- [ ] Push notifications — Direct APNs via `node-apn` (Decision 024)
+  - [ ] `device_tokens` Prisma table
+  - [ ] iOS: register for notifications, store token via API
+  - [ ] BullMQ notification job (weekly recap ready, AI insight alerts)
+- [ ] Manager profile sharing (shareable cards for social media)
+- [ ] Manager identity merging / alias system
+
+---
+
 ## V3 — Engagement (not started)
 
 - [ ] Trade analyzer
 - [ ] Waiver wire recommendations
 - [ ] Playoff probability models
 - [ ] League awards ceremony
+
+---
+
+## Future Enhancements (no priority order)
+
+### Intelligence Layer
+- [x] **Roster as core data** — `roster_players` table stores current-season roster for all managers, synced as part of the league sync job. Both Sleeper and Yahoo supported. `roster.ts` reads from DB, no live API calls.
+- [ ] **Roster staleness indicator** — `syncedAt` is stored per row but the UI doesn't surface it. Could show "last updated X hours ago" or auto-trigger a roster refresh when > 24h stale.
+- [ ] **Reddit + SportsDataIO credentials** — add `REDDIT_CLIENT_ID/SECRET` and `SPORTSDATA_API_KEY` to `api/.env` to enable those adapters. Reddit: create OAuth app at reddit.com/prefs/apps. SportsDataIO: free tier key from sportsdata.io.
+- [ ] **Bluesky ingestion adapter** — stub planned, not implemented.
+- [ ] **"My Roster" filter on Picks tab** — currently only applies to the Feed section. Picks (recommendations) always show all players.

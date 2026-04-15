@@ -503,3 +503,124 @@ struct SelectLeaguesStep: View {
 
 // ImportingStep has been replaced by ImportProgressView in ImportProgressView.swift
 // SignInView has been moved to SignInView.swift with Clerk SDK integration
+struct YahooConnectStep: View {
+    let userId: String?
+    let isConnected: Bool
+    let isLoading: Bool
+    let error: String?
+    let onCheckStatus: () async -> Void
+    let onDiscover: () async -> Void
+
+    @State private var waitingForBrowser = false
+
+    private var authURL: URL? {
+        var components = URLComponents(string: "https://localhost:3443/api/auth/yahoo")
+        if let userId {
+            components?.queryItems = [URLQueryItem(name: "userId", value: userId)]
+        }
+        return components?.url
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            VStack(spacing: Theme.spacingLG) {
+                Image(systemName: "y.circle.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Theme.accent)
+
+                if isLoading {
+                    VStack(spacing: Theme.spacingSM) {
+                        ProgressView()
+                            .tint(Theme.accent)
+                        Text(waitingForBrowser ? "Finding your leagues..." : "Checking Yahoo connection...")
+                            .font(Theme.bodyFont)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                } else if waitingForBrowser {
+                    VStack(spacing: Theme.spacingSM) {
+                        Text("Complete Sign-In")
+                            .font(Theme.headlineFont)
+                            .foregroundStyle(Theme.textPrimary)
+
+                        Text("Complete the sign-in in your browser, then tap the button below.")
+                            .font(Theme.bodyFont)
+                            .foregroundStyle(Theme.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                } else {
+                    VStack(spacing: Theme.spacingSM) {
+                        Text("Connect Yahoo")
+                            .font(Theme.headlineFont)
+                            .foregroundStyle(Theme.textPrimary)
+
+                        Text("Sign in with your Yahoo account to import your league history.")
+                            .font(Theme.bodyFont)
+                            .foregroundStyle(Theme.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+
+                if let error {
+                    Text(error)
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Theme.loss)
+                        .multilineTextAlignment(.center)
+                }
+            }
+
+            Spacer()
+
+            if !isLoading {
+                VStack(spacing: Theme.spacingSM) {
+                    if waitingForBrowser {
+                        Button {
+                            Task { await onCheckStatus() }
+                        } label: {
+                            Text("I've Signed In")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(Theme.charcoal)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                        .background(Theme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMD))
+
+                        Button {
+                            openYahooAuth()
+                        } label: {
+                            Text("Reopen Browser")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Theme.accent)
+                        }
+                    } else {
+                        Button {
+                            openYahooAuth()
+                        } label: {
+                            Text("Sign in with Yahoo")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(Theme.charcoal)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                        .background(Theme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMD))
+                    }
+                }
+                .padding(.bottom, Theme.spacingXL)
+            }
+        }
+    }
+
+    private func openYahooAuth() {
+        guard let authURL else { return }
+        UIApplication.shared.open(authURL) { opened in
+            Task { @MainActor in
+                if opened {
+                    waitingForBrowser = true
+                }
+            }
+        }
+    }
+}
