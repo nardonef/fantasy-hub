@@ -62,6 +62,20 @@ export interface ProviderSeasonData {
   championManagerId: string | null;
 }
 
+export type RosterSlot = "STARTER" | "BENCH" | "IR" | "TAXI";
+
+/**
+ * A single player on a manager's current roster, as returned by a provider.
+ * For Sleeper: providerPlayerId is the Sleeper player ID (e.g. "4046").
+ * For Yahoo:   providerPlayerId is the player's full name (best available without a separate player lookup).
+ */
+export interface ProviderRosterPlayer {
+  managerProviderManagerId: string;
+  providerPlayerId: string;
+  playerName?: string;   // human-readable if different from providerPlayerId
+  slot: RosterSlot | null;
+}
+
 /**
  * Provider adapter interface — each provider (Yahoo, ESPN, Sleeper)
  * implements this to normalize their API data into shared types.
@@ -76,4 +90,14 @@ export interface ProviderAdapter {
     leagueId: string,
     year: number
   ): Promise<ProviderSeasonData>;
+
+  /**
+   * Fetch the current-season roster for all managers in a league.
+   * Optional — not all providers support live roster fetching.
+   * leagueId should be the current-season league ID (not a historical one).
+   */
+  getCurrentRoster?(
+    credentials: Record<string, string>,
+    leagueId: string
+  ): Promise<ProviderRosterPlayer[]>;
 }

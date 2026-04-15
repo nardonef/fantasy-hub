@@ -374,4 +374,99 @@ router.get("/:leagueId/my-manager", requireAuth, requireLeagueMember, async (req
   res.json(manager);
 });
 
+/**
+ * POST /api/leagues/:leagueId/roster/refresh
+ *
+ * Re-syncs the current-season roster for this league from the provider.
+ * Wipes and replaces all roster_players rows for the league.
+ * Used by the Intel feed "My Team" filter to ensure fresh roster data without a full re-sync.
+ */
+router.post("/:leagueId/roster/refresh", requireAuth, requireLeagueMember, async (req, res) => {
+  const { leagueId } = req.params as Record<string, string>;
+  const user = (req as any).dbUser;
+
+  const league = await prisma.league.findUnique({
+    where: { id: leagueId },
+    select: { provider: true, providerLeagueId: true, metadata: true },
+  });
+  if (!league) {
+    res.status(404).json({ error: "League not found" });
+    return;
+  }
+
+  const adapter = getAdapter(league.provider);
+  if (!adapter.getCurrentRoster) {
+    res.json({ synced: 0, message: "Provider does not support roster sync" });
+    return;
+  }
+
+  // Resolve credentials the same way the sync route does
+  const credentials: Record<string, string> = {};
+  if (league.provider === "YAHOO") {
+    try {
+      const accessToken = await getValidYahooToken(user.id);
+      if (accessToken) credentials.accessToken = accessToken;
+    } catch {
+      res.status(503).json({ error: "Yahoo token refresh failed — please reconnect your account" });
+      return;
+    }
+  } else {
+    const providerAccount = await prisma.providerAccount.findFirst({
+      where: { userId: user.id, provider: league.provider },
+    });
+    if (providerAccount?.accessToken) credentials.accessToken = providerAccount.accessToken;
+  }
+
+  try {
+    // Use the current-season league ID (may differ from the stored providerLeagueId for multi-season leagues)
+    const now = new Date();
+    const currentYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+    const seasonLeagueIds = (league.metadata as any)?.seasonLeagueIds ?? {};
+    const currentLeagueId = seasonLeagueIds[currentYear] ?? league.providerLeagueId;
+
+    const rosterPlayers = await adapter.getCurrentRoster(credentials, currentLeagueId);
+
+    await prisma.rosterPlayer.deleteMany({ where: { leagueId } });
+
+    const managers = await prisma.manager.findMany({
+      where: { leagueId },
+      select: { id: true, providerManagerId: true },
+    });
+    const managerMap = new Map(managers.map((m) => [m.providerManagerId, m.id]));
+    const syncedAt = new Date();
+
+    for (const rp of rosterPlayers) {
+      const managerId = managerMap.get(rp.managerProviderManagerId);
+      if (!managerId) continue;
+
+      let playerId: string | null = null;
+      let playerName = rp.playerName ?? rp.providerPlayerId;
+
+      if (league.provider === "SLEEPER") {
+        const rows = await prisma.$queryRaw<{ id: string; full_name: string }[]>`
+          SELECT id, full_name FROM players
+          WHERE metadata->>'sleeperId' = ${rp.providerPlayerId}
+          LIMIT 1
+        `;
+        if (rows[0]) { playerId = rows[0].id; playerName = rows[0].full_name; }
+      } else {
+        const player = await prisma.player.findFirst({
+          where: { fullName: { equals: rp.providerPlayerId, mode: "insensitive" } },
+          select: { id: true, fullName: true },
+        });
+        if (player) { playerId = player.id; playerName = player.fullName; }
+      }
+
+      await prisma.rosterPlayer.create({
+        data: { leagueId, managerId, playerId, playerName, slot: rp.slot, syncedAt },
+      });
+    }
+
+    res.json({ synced: rosterPlayers.length });
+  } catch (err: any) {
+    console.error(`Roster refresh failed for league ${leagueId}:`, err.message);
+    res.status(500).json({ error: "Roster refresh failed" });
+  }
+});
+
 export default router;

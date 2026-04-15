@@ -85,20 +85,6 @@ actor APIClient {
         try await request(.get, path: "/leagues/\(leagueId)/sync-status")
     }
 
-    // MARK: - Invite Endpoints
-
-    func generateInviteLink(leagueId: String) async throws -> InviteResponse {
-        try await request(.post, path: "/leagues/\(leagueId)/invite")
-    }
-
-    func previewInvite(code: String) async throws -> InvitePreview {
-        try await request(.get, path: "/leagues/invite/\(code)")
-    }
-
-    func joinLeague(inviteCode: String) async throws -> JoinLeagueResponse {
-        try await request(.post, path: "/leagues/join/\(inviteCode)")
-    }
-
     // MARK: - Analytics Endpoints
 
     func getStandings(leagueId: String, year: Int? = nil) async throws -> [StandingsEntry] {
@@ -148,16 +134,19 @@ actor APIClient {
         return try await request(.get, path: path)
     }
 
-    func getManagerProfile(leagueId: String, managerId: String) async throws -> ManagerProfile {
-        try await request(.get, path: "/leagues/\(leagueId)/managers/\(managerId)/profile")
-    }
-
     func claimManager(leagueId: String, managerId: String) async throws -> Manager {
         try await request(.put, path: "/leagues/\(leagueId)/managers/\(managerId)/claim")
     }
 
     func getMyManager(leagueId: String) async throws -> Manager? {
         try await request(.get, path: "/leagues/\(leagueId)/my-manager")
+    }
+
+    @discardableResult
+    func refreshRoster(leagueId: String) async throws -> Int {
+        struct RefreshResponse: Decodable { let synced: Int }
+        let response: RefreshResponse = try await request(.post, path: "/leagues/\(leagueId)/roster/refresh")
+        return response.synced
     }
 
     func getDashboard(leagueId: String) async throws -> DashboardData? {
@@ -239,6 +228,47 @@ actor APIClient {
     func updateThreadTitle(leagueId: String, threadId: String, title: String) async throws -> ChatThread {
         let body: [String: Any] = ["title": title]
         return try await request(.patch, path: "/leagues/\(leagueId)/chat/threads/\(threadId)", body: body)
+    }
+
+    // MARK: - Feed & Intelligence Endpoints
+
+    func getFeed(
+        leagueId: String,
+        source: SignalSource? = nil,
+        type: SignalType? = nil,
+        playerId: String? = nil,
+        position: String? = nil,
+        myRosterOnly: Bool = false,
+        limit: Int = 20,
+        cursor: String? = nil
+    ) async throws -> FeedResponse {
+        var params: [String] = ["limit=\(limit)"]
+        if let source { params.append("source=\(source.rawValue)") }
+        if let type { params.append("type=\(type.rawValue)") }
+        if let playerId { params.append("playerId=\(playerId)") }
+        if let position { params.append("position=\(position)") }
+        if myRosterOnly { params.append("myRosterOnly=true") }
+        if let cursor, let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            params.append("cursor=\(encoded)")
+        }
+        return try await request(.get, path: "/leagues/\(leagueId)/feed?\(params.joined(separator: "&"))")
+    }
+
+    func getRecommendations(leagueId: String, limit: Int = 20) async throws -> RecommendationsResponse {
+        try await request(.get, path: "/leagues/\(leagueId)/recommendations?limit=\(limit)")
+    }
+
+    func searchPlayers(query: String) async throws -> [PlayerSearchResult] {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            return []
+        }
+        let response: PlayerSearchResponse = try await request(.get, path: "/players/search?q=\(encoded)")
+        return response.players
+    }
+
+    func getPlayer(playerId: String) async throws -> PlayerDetail {
+        let response: PlayerDetailResponse = try await request(.get, path: "/players/\(playerId)")
+        return response.player
     }
 
     // MARK: - Auth Endpoints

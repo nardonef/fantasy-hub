@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision 19: Player Detail Layout — Fantasy League Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1a1a2e; min-height: 100vh; padding: 2rem; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; max-width: 1200px; margin-left: auto; margin-right: auto; }
+    .decision-number { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #64748b; }
+    header h1 { font-size: 1.6rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin-top: 0.25rem; }
+    .category-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; }
+    .category-badge.interaction { background: #e0f2fe; color: #0369a1; }
+    .decision-description { font-size: 1rem; color: #475569; margin-top: 0.75rem; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.7; }
+    .instruction { margin-top: 1rem; font-size: 0.85rem; background: #eff6ff; color: #1d4ed8; padding: 0.6rem 1.25rem; border-radius: 8px; display: inline-block; border: 1px solid #bfdbfe; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem; }
+    .option-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid #e2e8f0; transition: all 0.2s ease; display: flex; flex-direction: column; position: relative; }
+    .option-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.12); }
+    .card-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .card-header-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .option-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .option-card.option-a .option-label { color: #7c3aed; }
+    .option-card.option-b .option-label { color: #0891b2; }
+    .option-card.option-c .option-label { color: #059669; }
+    .option-card.option-d .option-label { color: #dc2626; }
+    .option-title { font-size: 1.05rem; font-weight: 600; color: #0f172a; }
+    .recommended-badge { background: #f59e0b; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    .card-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .chosen-badge { background: #059669; color: white; padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; display: none; }
+    .option-card.chosen { border: 3px solid #059669; box-shadow: 0 4px 20px rgba(5,150,105,0.15); }
+    .option-card.chosen .chosen-badge { display: inline-block; }
+    .option-card.not-chosen { opacity: 0.55; filter: grayscale(20%); }
+    .option-card.not-chosen:hover { opacity: 0.8; filter: none; }
+    .visual-preview { padding: 1.5rem; background: #f8fafc; min-height: 260px; display: flex; align-items: center; justify-content: center; flex: 1; }
+    .option-summary { padding: 1rem 1.25rem; font-size: 0.875rem; color: #334155; line-height: 1.65; border-top: 1px solid #f1f5f9; }
+    .verdict { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #f1f5f9; }
+    .pros, .cons { padding: 1rem 1.25rem; }
+    .pros { border-right: 1px solid #f1f5f9; }
+    .pros h3, .cons h3 { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .pros h3 { color: #059669; }
+    .cons h3 { color: #e11d48; }
+    .verdict ul { list-style: none; padding: 0; }
+    .verdict li { font-size: 0.8rem; color: #475569; line-height: 1.5; padding: 0.15rem 0; padding-left: 1rem; position: relative; }
+    .pros li::before { content: "✓ "; color: #059669; font-weight: 700; position: absolute; left: 0; }
+    .cons li::before { content: "! "; color: #e11d48; font-weight: 700; position: absolute; left: 0; }
+    .card-footer { padding: 0.75rem 1.25rem; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .tell-claude { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 0.35rem 0.65rem; border-radius: 6px; display: block; font-family: 'SF Mono', 'Fira Code', monospace; }
+    .comparison-section { max-width: 1200px; margin: 0 auto 3rem; }
+    .comparison-section h2 { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; }
+    .comparison-table-wrapper { overflow-x: auto; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); }
+    .comparison-table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+    .comparison-table th { padding: 0.85rem 1rem; text-align: left; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; white-space: nowrap; position: sticky; top: 0; background: white; }
+    .comparison-table th:first-child { position: sticky; left: 0; z-index: 2; background: #f8fafc; color: #64748b; }
+    .comparison-table th.col-a { color: #7c3aed; }
+    .comparison-table th.col-b { color: #0891b2; }
+    .comparison-table th.col-c { color: #059669; }
+    .comparison-table th.col-d { color: #dc2626; }
+    .comparison-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .comparison-table td:first-child { font-weight: 600; color: #475569; position: sticky; left: 0; background: #f8fafc; }
+    .comparison-table tr:nth-child(even) td { background: #fafbfc; }
+    .comparison-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+    .comparison-table .col-recommended { background: #fffbeb !important; }
+    .comparison-table .col-chosen { background: #ecfdf5 !important; }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .page-footer { max-width: 1200px; margin: 0 auto; text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .page-footer p { font-size: 0.85rem; color: #64748b; margin: 0.3rem 0; }
+    .page-footer strong { color: #334155; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.85rem; color: #6366f1; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    @media (max-width: 768px) { .options-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← All Decisions</a>
+
+  <header>
+    <span class="decision-number">Decision 19 of 28</span>
+    <h1>Player Detail Layout</h1>
+    <span class="category-badge interaction">Interaction</span>
+    <p class="decision-description">
+      When a user taps a player name anywhere in the feed, they land on a Player Detail view. This view needs to compose four distinct data types — current rankings, weekly stats, social sentiment (Reddit/Bluesky mentions), and recommendation signals — into a single coherent screen. The challenge is that these data types have different shapes and different urgency levels. This decision is about which one leads, how the others are presented, and whether the layout uses scrolling sections, tabs, or a hybrid.
+    </p>
+    <p class="instruction">
+      Tell Claude: <strong>"Option A"</strong> · <strong>"Option B but [change]"</strong> · <strong>"more options"</strong>
+    </p>
+  </header>
+
+  <main class="options-grid">
+
+    <!-- Option A: Stats Hero + Signal Feed -->
+    <article class="option-card option-a chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option A</span>
+          <div class="card-badges">
+            <span class="recommended-badge">Recommended</span>
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Stats Hero + Signal Feed</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%;max-width:260px;background:#1A1A1A;border-radius:12px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif">
+          <!-- Hero -->
+          <div style="padding:12px;border-bottom:1px solid #2a2a2a">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div>
+                <div style="font-size:0.9rem;font-weight:700;color:#E8E2D6">Patrick Mahomes</div>
+                <div style="font-size:0.6rem;color:#C9A96E;margin-top:1px">QB · KC · ECR #1</div>
+              </div>
+              <div style="background:#2a2a2a;border-radius:8px;padding:5px 8px;text-align:center">
+                <div style="font-size:0.55rem;color:#888;text-transform:uppercase;letter-spacing:0.05em">Proj</div>
+                <div style="font-size:0.85rem;font-weight:700;color:#4ADE80">28.4</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <div style="flex:1;background:#222;border-radius:6px;padding:5px 6px;text-align:center">
+                <div style="font-size:0.5rem;color:#888">Season Avg</div>
+                <div style="font-size:0.7rem;font-weight:700;color:#E8E2D6">24.1</div>
+              </div>
+              <div style="flex:1;background:#222;border-radius:6px;padding:5px 6px;text-align:center">
+                <div style="font-size:0.5rem;color:#888">Last 3</div>
+                <div style="font-size:0.7rem;font-weight:700;color:#4ADE80">27.8</div>
+              </div>
+              <div style="flex:1;background:#222;border-radius:6px;padding:5px 6px;text-align:center">
+                <div style="font-size:0.5rem;color:#888">Rank Δ</div>
+                <div style="font-size:0.7rem;font-weight:700;color:#4ADE80">+0</div>
+              </div>
+            </div>
+          </div>
+          <!-- Signal feed -->
+          <div style="padding:8px 10px">
+            <div style="font-size:0.55rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Recent Signals</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <div style="background:#222;border-radius:6px;padding:6px 8px;border-left:2px solid #FF6600">
+                <div style="font-size:0.6rem;font-weight:600;color:#E8E2D6">"Arm strength back to 2022 levels"</div>
+                <div style="font-size:0.5rem;color:#888;margin-top:2px">Reddit · ↑847 · 2h ago</div>
+              </div>
+              <div style="background:#222;border-radius:6px;padding:6px 8px;border-left:2px solid #0085FF">
+                <div style="font-size:0.6rem;font-weight:600;color:#E8E2D6">"Elite matchup this week vs NYG"</div>
+                <div style="font-size:0.5rem;color:#888;margin-top:2px">Bluesky · @matthewberry · 4h ago</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        A sticky stats hero at the top (ranking, projected points, season average, last-3-week trend) stays visible as the user scrolls down into a chronological signal feed below. Stats answer the "what do I know about this player" question immediately. The feed below surfaces recent social mentions, ranking changes, and recommendation signals in time order. This maps naturally to how fantasy users think: check the number first, then understand the narrative. I recommend this because the data hierarchy matches user intent — stats are the fact, signals are the context.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Users come for a quick stats check — answer that immediately above the fold</li>
+            <li>Signal feed grows naturally as more sources come online over time</li>
+            <li>Sticky hero keeps key numbers visible while scrolling through signals</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Hero takes vertical space — signal feed starts lower on smaller phones</li>
+            <li>Mixed signal types in one feed can feel unstructured without clear grouping</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option A"</code>
+      </div>
+    </article>
+
+    <!-- Option B: Signal-First with Stats Drawer -->
+    <article class="option-card option-b not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option B</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Signal-First + Stats Drawer</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%;max-width:260px;background:#1A1A1A;border-radius:12px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif">
+          <!-- Compact header -->
+          <div style="padding:10px 12px;border-bottom:1px solid #2a2a2a;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:0.85rem;font-weight:700;color:#E8E2D6">Patrick Mahomes</div>
+              <div style="font-size:0.55rem;color:#C9A96E">QB · KC</div>
+            </div>
+            <div style="background:#2a2a2a;border:1px solid #444;border-radius:7px;padding:4px 8px;font-size:0.6rem;color:#aaa;cursor:pointer">Stats ↓</div>
+          </div>
+          <!-- Signal feed starts high -->
+          <div style="padding:8px 10px">
+            <div style="font-size:0.55rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">What's happening now</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <div style="background:#222;border-radius:6px;padding:6px 8px;border-left:2px solid #4ADE80">
+                <div style="font-size:0.55rem;font-weight:700;color:#4ADE80;text-transform:uppercase;margin-bottom:2px">Start recommended</div>
+                <div style="font-size:0.6rem;color:#E8E2D6">ECR QB1 · 3 sources agree</div>
+              </div>
+              <div style="background:#222;border-radius:6px;padding:6px 8px;border-left:2px solid #FF6600">
+                <div style="font-size:0.6rem;font-weight:600;color:#E8E2D6">"Arm strength back to 2022..."</div>
+                <div style="font-size:0.5rem;color:#888;margin-top:2px">Reddit · ↑847 · 2h ago</div>
+              </div>
+              <div style="background:#222;border-radius:6px;padding:6px 8px;border-left:2px solid #0085FF">
+                <div style="font-size:0.6rem;color:#E8E2D6">"Elite matchup vs NYG"</div>
+                <div style="font-size:0.5rem;color:#888;margin-top:2px">Bluesky · 4h ago</div>
+              </div>
+            </div>
+          </div>
+          <!-- Collapsed stats drawer hint -->
+          <div style="padding:6px 12px;background:#111;border-top:1px solid #2a2a2a">
+            <div style="font-size:0.55rem;color:#666;text-align:center">Tap "Stats" to expand season numbers</div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        The signal feed starts immediately below a compact two-line header. Stats are collapsed into a drawer — tap "Stats" to expand a panel showing projections, averages, and rank history. This prioritizes recency: if you tapped a player from the feed, you already know why. You want to read more about the signal that caught your eye, not see a stat table you already know. Stats are one tap away but don't push the feed down. The tradeoff is that the drawer interaction adds a step for users who arrive cold.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Entry point is always a specific signal — users want more context on what they just saw</li>
+            <li>Signal feed starts above the fold on all screen sizes</li>
+            <li>Most users already know the player's baseline stats</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Drawer adds a tap for users who check stats first — against established pattern</li>
+            <li>Collapsed stats can feel like the app is hiding useful info</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option B"</code>
+      </div>
+    </article>
+
+    <!-- Option C: Tabbed Layout -->
+    <article class="option-card option-c not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option C</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Tabbed Layout</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%;max-width:260px;background:#1A1A1A;border-radius:12px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif">
+          <!-- Header -->
+          <div style="padding:10px 12px 8px;border-bottom:1px solid #2a2a2a">
+            <div style="font-size:0.85rem;font-weight:700;color:#E8E2D6">Patrick Mahomes</div>
+            <div style="font-size:0.55rem;color:#C9A96E">QB · KC · ECR #1</div>
+          </div>
+          <!-- Tabs -->
+          <div style="display:flex;border-bottom:1px solid #2a2a2a">
+            <div style="flex:1;padding:7px;text-align:center;font-size:0.6rem;font-weight:700;color:#C9A96E;border-bottom:2px solid #C9A96E">Stats</div>
+            <div style="flex:1;padding:7px;text-align:center;font-size:0.6rem;font-weight:600;color:#666">Signals</div>
+            <div style="flex:1;padding:7px;text-align:center;font-size:0.6rem;font-weight:600;color:#666">Rankings</div>
+          </div>
+          <!-- Stats tab content -->
+          <div style="padding:8px 10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+              <div style="background:#222;border-radius:6px;padding:6px 8px">
+                <div style="font-size:0.5rem;color:#888">Projected</div>
+                <div style="font-size:0.75rem;font-weight:700;color:#4ADE80">28.4</div>
+              </div>
+              <div style="background:#222;border-radius:6px;padding:6px 8px">
+                <div style="font-size:0.5rem;color:#888">Season Avg</div>
+                <div style="font-size:0.75rem;font-weight:700;color:#E8E2D6">24.1</div>
+              </div>
+              <div style="background:#222;border-radius:6px;padding:6px 8px">
+                <div style="font-size:0.5rem;color:#888">Last 3 Avg</div>
+                <div style="font-size:0.75rem;font-weight:700;color:#4ADE80">27.8</div>
+              </div>
+              <div style="background:#222;border-radius:6px;padding:6px 8px">
+                <div style="font-size:0.5rem;color:#888">Ceiling</div>
+                <div style="font-size:0.75rem;font-weight:700;color:#E8E2D6">41.2</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        Three tabs — Stats, Signals, Rankings — each with its own full-height scrollable section. Stats gets a stat grid, Signals gets the social/sentiment feed, Rankings gets the ECR history chart. Users navigate between sections with a tab bar below the player header. This is the clearest information architecture: each data type gets undivided space. The tradeoff is that users can only see one dimension at a time and have to tab between them to build a complete picture of the player.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Each data type needs full vertical space to breathe (especially charts)</li>
+            <li>Users have a clear mental model — "I want to check rankings" → Rankings tab</li>
+            <li>Each section grows independently as more data types are added</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>Tab switching friction — users have to know to look in other tabs</li>
+            <li>Signals and ranking moves feel disconnected from the stats that contextualize them</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option C"</code>
+      </div>
+    </article>
+
+    <!-- Option D: Scorecard + Expandable Sections -->
+    <article class="option-card option-d not-chosen">
+      <div class="card-header">
+        <div class="card-header-top">
+          <span class="option-label">Option D</span>
+          <div class="card-badges">
+            <span class="chosen-badge">Chosen</span>
+          </div>
+        </div>
+        <h2 class="option-title">Scorecard + Expandable Sections</h2>
+      </div>
+      <div class="visual-preview">
+        <div style="width:100%;max-width:260px;background:#1A1A1A;border-radius:12px;overflow:hidden;font-family:-apple-system,system-ui,sans-serif">
+          <!-- Scorecard header -->
+          <div style="padding:10px 12px;background:#111;border-bottom:1px solid #2a2a2a">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:0.85rem;font-weight:700;color:#E8E2D6">Patrick Mahomes</div>
+                <div style="font-size:0.55rem;color:#C9A96E">QB · KC</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:1rem;font-weight:800;color:#4ADE80">28.4</div>
+                <div style="font-size:0.5rem;color:#888">projected</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:5px;margin-top:7px">
+              <span style="background:#1a3a1a;color:#4ADE80;font-size:0.5rem;font-weight:700;padding:2px 6px;border-radius:4px">ECR #1</span>
+              <span style="background:#1a3a1a;color:#4ADE80;font-size:0.5rem;font-weight:700;padding:2px 6px;border-radius:4px">3 signals</span>
+              <span style="background:#2a2a1a;color:#C9A96E;font-size:0.5rem;font-weight:700;padding:2px 6px;border-radius:4px">↑ trending</span>
+            </div>
+          </div>
+          <!-- Expandable sections -->
+          <div style="padding:6px 10px;display:flex;flex-direction:column;gap:4px">
+            <div style="background:#222;border-radius:6px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:0.65rem;font-weight:600;color:#E8E2D6">Stats & History</span>
+              <span style="font-size:0.7rem;color:#888">›</span>
+            </div>
+            <div style="background:#222;border-radius:6px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;border:1px solid #333">
+              <span style="font-size:0.65rem;font-weight:600;color:#E8E2D6">Social Signals <span style="background:#C9A96E;color:#1A1A1A;border-radius:4px;padding:1px 5px;font-size:0.5rem;font-weight:800;margin-left:4px">3</span></span>
+              <span style="font-size:0.7rem;color:#888">›</span>
+            </div>
+            <div style="background:#222;border-radius:6px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:0.65rem;font-weight:600;color:#E8E2D6">Rankings History</span>
+              <span style="font-size:0.7rem;color:#888">›</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-summary">
+        A compact scorecard header summarizes the player's status — projected points, ECR rank, signal count, trend direction — in a single glance. Below it, three expandable section rows (Stats, Social Signals, Rankings) expand inline when tapped, revealing the full content without navigating away. This gives the most information density: the header answers "should I care about this player right now" in one line, and sections expand only for what the user wants to dig into. The downside is that all sections start collapsed, requiring taps to see any content.
+      </div>
+      <div class="verdict">
+        <div class="pros">
+          <h3>Works well when</h3>
+          <ul>
+            <li>Users want a quick yes/no on a player before deciding to dig in</li>
+            <li>Scorecard summary reduces need to open any section for casual checks</li>
+            <li>Expandable pattern is familiar from iOS Settings and similar apps</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Watch out for</h3>
+          <ul>
+            <li>All content hidden behind taps — users who want to read signals see nothing by default</li>
+            <li>Scorecard summary logic is complex to compute correctly across all data types</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card-footer">
+        <code class="tell-claude">Tell Claude: "Option D"</code>
+      </div>
+    </article>
+
+  </main>
+
+  <section class="comparison-section">
+    <h2>How They Compare</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-a col-recommended">A: Stats Hero + Feed</th>
+            <th class="col-b">B: Signal-First + Drawer</th>
+            <th class="col-c">C: Tabbed</th>
+            <th class="col-d">D: Scorecard + Expand</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>What's visible on load</td>
+            <td class="col-recommended">Stats hero + first signals</td>
+            <td>Full signal feed</td>
+            <td>Stats tab content</td>
+            <td>Scorecard + section rows</td>
+          </tr>
+          <tr>
+            <td>Taps to see all data types</td>
+            <td class="col-recommended">0 — just scroll</td>
+            <td>1 — open stats drawer</td>
+            <td>2 — switch tabs</td>
+            <td>3 — expand each section</td>
+          </tr>
+          <tr>
+            <td>Best entry point</td>
+            <td class="col-recommended">Any (balanced)</td>
+            <td>From feed signal tap</td>
+            <td>Direct navigation</td>
+            <td>Quick status check</td>
+          </tr>
+          <tr>
+            <td>Signal + stats together</td>
+            <td class="col-recommended">Yes — stats above, signals below</td>
+            <td>No — separated by drawer</td>
+            <td>No — separated by tabs</td>
+            <td>Partially — summary only</td>
+          </tr>
+          <tr>
+            <td>Works with sparse data</td>
+            <td class="col-recommended">Yes — hero stands alone</td>
+            <td>Yes — feed still shows</td>
+            <td>Yes — empty tab states</td>
+            <td>Partially — scorecard needs data</td>
+          </tr>
+          <tr>
+            <td>Build complexity</td>
+            <td class="col-recommended">Low</td>
+            <td>Medium (drawer)</td>
+            <td>Low</td>
+            <td>High (scorecard logic)</td>
+          </tr>
+          <tr>
+            <td>Expandable over time</td>
+            <td class="col-recommended">Yes — add more signal cards</td>
+            <td>Yes — drawer content grows</td>
+            <td>Yes — add tabs</td>
+            <td>Yes — add section rows</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-footer">
+    <p>Tell Claude: <strong>"Option A"</strong>, <strong>"Option C but [your change]"</strong>, or <strong>"more options"</strong></p>
+    <p>To change a past decision: <strong>"for decision-018 I want Option C instead"</strong></p>
+  </div>
+</body>
+</html>

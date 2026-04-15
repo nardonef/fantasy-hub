@@ -4,7 +4,6 @@ struct ProfileView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var leagueStore: LeagueStore
     @State private var yahooConnected = false
-    @State private var showingAddLeague = false
 
     var body: some View {
         NavigationStack {
@@ -103,22 +102,6 @@ struct ProfileView: View {
                         }
                         .cardStyle()
 
-                        Button {
-                            showingAddLeague = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "plus.circle")
-                                    .font(.system(size: 16))
-                                Text("Add League")
-                                    .font(.system(size: 14, weight: .medium))
-                            }
-                            .foregroundStyle(Theme.accent)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Theme.card)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMD))
-                        }
-                        .padding(.top, Theme.spacingSM)
                     }
 
                     // Settings
@@ -167,11 +150,6 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .fullScreenCover(isPresented: $showingAddLeague, onDismiss: { Task { await checkYahooStatus() } }) {
-                AddLeagueSheet()
-                    .environmentObject(authManager)
-                    .environmentObject(leagueStore)
-            }
             .task { await checkYahooStatus() }
         }
     }

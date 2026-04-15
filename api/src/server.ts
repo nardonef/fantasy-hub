@@ -13,7 +13,10 @@ import activityRoutes from "./routes/activity";
 import yahooAuthRoutes from "./routes/yahoo-auth";
 import insightsRoutes from "./routes/insights";
 import chatRoutes from "./routes/chat";
+import feedRoutes from "./routes/feed";
+import playerRoutes from "./routes/players";
 import { startSyncWorker } from "./jobs/sync-league";
+import { startIngestionWorker, ingestionQueue } from "./jobs/ingest-signals";
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
@@ -41,6 +44,8 @@ app.use("/api/leagues", managerRoutes);
 app.use("/api/leagues", activityRoutes);
 app.use("/api/leagues", insightsRoutes);
 app.use("/api/leagues", chatRoutes);
+app.use("/api/leagues", feedRoutes);
+app.use("/api/players", playerRoutes);
 app.use("/api/auth", yahooAuthRoutes);
 
 // Start HTTP server (for iOS app and general use)
@@ -58,11 +63,29 @@ if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
     { cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) },
     app
   );
+  httpsServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn(`HTTPS port ${HTTPS_PORT} already in use — skipping HTTPS server`);
+    } else {
+      console.error("HTTPS server error:", err);
+    }
+  });
   httpsServer.listen(HTTPS_PORT, () => {
     console.log(`Fantasy Hub API (HTTPS) running on https://localhost:${HTTPS_PORT}`);
   });
 }
 
-// Start background sync worker
+// Start background workers
 startSyncWorker();
 console.log("Sync worker started");
+
+startIngestionWorker();
+console.log("Ingestion worker started");
+
+// Always schedule ingestion twice daily (6am and 6pm); FantasyPros requires no credentials
+ingestionQueue.upsertJobScheduler(
+  "ingest-signals-cron",
+  { pattern: "0 6,18 * * *" },
+  { name: "ingest-signals", data: {} }
+);
+console.log("Ingestion cron scheduled (6am/6pm daily)");
