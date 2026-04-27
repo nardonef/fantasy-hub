@@ -6,7 +6,7 @@ import type { SignalSource, SignalType } from "../generated/prisma/client";
 
 const router = Router();
 
-const SIGNAL_SOURCES = new Set(["REDDIT", "BLUESKY", "SPORTSDATA", "FANTASYPROS"]);
+const SIGNAL_SOURCES = new Set(["REDDIT", "BLUESKY", "SPORTSDATA", "FANTASYPROS", "TWITTER"]);
 const SIGNAL_TYPES = new Set(["RANKING_CHANGE", "SOCIAL_MENTION", "STATS_UPDATE", "RECOMMENDATION"]);
 const POSITIONS = new Set(["QB", "RB", "WR", "TE", "K", "DEF"]);
 const MAX_LIMIT = 100;

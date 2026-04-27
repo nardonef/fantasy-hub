@@ -320,9 +320,10 @@ model Player {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  aliases       PlayerNameAlias[]
-  signals       Signal[]
-  rosterPlayers RosterPlayer[]
+  aliases          PlayerNameAlias[]
+  signals          Signal[]
+  rosterPlayers    RosterPlayer[]
+  rankingSnapshots PlayerRankingSnapshot[]
 
   @@unique([fullName])
   @@map("players")
@@ -347,6 +348,7 @@ enum SignalSource {
   BLUESKY
   SPORTSDATA
   FANTASYPROS
+  TWITTER
 }
 
 enum SignalType {
@@ -371,6 +373,23 @@ model Signal {
   @@index([playerId, publishedAt])
   @@index([source, fetchedAt])
   @@map("signals")
+}
+
+model PlayerRankingSnapshot {
+  id        String       @id @default(cuid())
+  playerId  String       @map("player_id")
+  source    SignalSource
+  date      String       // YYYY-MM-DD
+  rankEcr   Int          @map("rank_ecr")
+  posRank   String?      @map("pos_rank")
+  rankDelta Int?         @map("rank_delta")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, source, date])
+  @@index([playerId, source])
+  @@map("player_ranking_snapshots")
 }
 
 model IngestionJob {

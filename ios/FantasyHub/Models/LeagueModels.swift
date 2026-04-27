@@ -467,6 +467,7 @@ enum SignalSource: String, Codable, CaseIterable {
     case bluesky = "BLUESKY"
     case sportsdata = "SPORTSDATA"
     case fantasypros = "FANTASYPROS"
+    case twitter = "TWITTER"
 
     var displayName: String {
         switch self {
@@ -474,6 +475,7 @@ enum SignalSource: String, Codable, CaseIterable {
         case .bluesky: "Bluesky"
         case .sportsdata: "SportsData"
         case .fantasypros: "FantasyPros"
+        case .twitter: "Twitter"
         }
     }
 
@@ -483,6 +485,7 @@ enum SignalSource: String, Codable, CaseIterable {
         case .bluesky: Color(hex: 0x0085FF)
         case .sportsdata: Color(hex: 0x9B59B6)
         case .fantasypros: Color(hex: 0x4ADE80)
+        case .twitter: Color(hex: 0x1DA1F2)
         }
     }
 }
@@ -531,12 +534,28 @@ struct FeedPlayer: Identifiable, Codable {
     }
 }
 
+/// Safely decodes ranking metadata from RANKING_CHANGE signals.
+/// Other signal types carry different metadata shapes — unknown fields are silently ignored.
+struct SignalMetadata: Codable {
+    let rankEcr: Int?
+    let rankDelta: Int?
+    let posRank: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rankEcr = try? c.decodeIfPresent(Int.self, forKey: .rankEcr)
+        rankDelta = try? c.decodeIfPresent(Int.self, forKey: .rankDelta)
+        posRank = try? c.decodeIfPresent(String.self, forKey: .posRank)
+    }
+}
+
 struct Signal: Identifiable, Codable {
     let id: String
     let playerId: String
     let source: SignalSource
     let signalType: SignalType
     let content: String
+    let metadata: SignalMetadata?
     let publishedAt: Date
     let fetchedAt: Date
     let player: FeedPlayer
@@ -605,6 +624,9 @@ struct PlayerDetail: Identifiable, Codable {
     let nflTeam: String?
     let status: String?
     let signals: [PlayerSignal]
+    let projectedPoints: Double?
+    let ownershipPct: Double?
+    let startPct: Double?
 
     var positionColor: Color {
         switch position?.uppercased() {
@@ -633,4 +655,142 @@ struct PlayerSearchResult: Identifiable, Codable {
 
 struct PlayerSearchResponse: Codable {
     let players: [PlayerSearchResult]
+}
+
+// MARK: - Intelligence Layer V2 — Typed Action Cards
+
+enum IntelligenceCardType: String, Codable {
+    case startSit = "START_SIT"
+    case waiverAlert = "WAIVER_ALERT"
+    case injuryNews = "INJURY_NEWS"
+    case rankingShift = "RANKING_SHIFT"
+    case hotTake = "HOT_TAKE"
+
+    var systemIcon: String {
+        switch self {
+        case .startSit: "arrow.left.arrow.right"
+        case .waiverAlert: "plus.circle.fill"
+        case .injuryNews: "cross.circle.fill"
+        case .rankingShift: "arrow.up.arrow.down.circle.fill"
+        case .hotTake: "flame.fill"
+        }
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .startSit: Color(hex: 0xC9A96E)
+        case .waiverAlert: Color(hex: 0x4ADE80)
+        case .injuryNews: Color(hex: 0xF87171)
+        case .rankingShift: Color(hex: 0x67E8F9)
+        case .hotTake: Color(hex: 0xFB923C)
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .startSit: "Start/Sit"
+        case .waiverAlert: "Waiver Alert"
+        case .injuryNews: "Injury Alert"
+        case .rankingShift: "Rankings"
+        case .hotTake: "Hot Take"
+        }
+    }
+}
+
+struct IntelligenceCard: Identifiable, Codable {
+    let type: IntelligenceCardType
+    let headline: String
+    let body: String
+    let confidence: Int
+    let players: [FeedPlayer]
+    let sources: [String]
+    let signalIds: [String]
+    let generatedAt: Date
+
+    var id: String { "\(type.rawValue)-\(players.first?.id ?? "")-\(generatedAt.timeIntervalSince1970)" }
+}
+
+struct IntelligenceResponse: Codable {
+    let actionItems: [IntelligenceCard]
+    let rosterNews: [Signal]
+    let leagueSignals: [Signal]
+    let nextCursor: String?
+    let generatedAt: Date
+}
+
+// MARK: - Ranking History
+
+struct RankHistoryPoint: Identifiable, Codable {
+    let id: String
+    let date: Date
+    let overallRank: Int
+    let positionRank: String?
+    let rankDelta: Int?
+    let source: SignalSource
+}
+
+struct RankingHistoryResponse: Codable {
+    let points: [RankHistoryPoint]
+}
+
+// MARK: - Today's Briefing
+
+struct TodaysBriefingResponse: Codable {
+    let synthesizedAt: Date
+    let signalCount: Int
+    let sourceCount: Int
+    let takeaways: [BriefingTakeaway]
+}
+
+struct BriefingTakeaway: Codable, Identifiable {
+    let id: String
+    let tag: TakeawayTag
+    let player: FeedPlayer
+    let headline: String
+    let rationale: String
+    let projectedDelta: String?
+    let confidence: Int
+    let sources: [SourceReference]
+    let rank7d: [Int]
+}
+
+enum TakeawayTag: String, Codable {
+    case sit = "SIT"
+    case add = "ADD"
+    case watch = "WATCH"
+    case start = "START"
+    case drop = "DROP"
+    case trade = "TRADE"
+
+    var toneColor: Color {
+        switch self {
+        case .sit, .drop: return Theme.loss
+        case .add, .start: return Theme.win
+        case .watch, .trade: return Theme.tie
+        }
+    }
+}
+
+struct SourceReference: Codable, Hashable {
+    let kind: SignalSource
+    let label: String
+}
+
+struct PlayerAISummary: Codable {
+    let verdict: TakeawayTag?
+    let body: String
+    let confidence: Int
+    let signalCount: Int
+}
+
+// MARK: - SignalSource chip icon
+
+extension SignalSource {
+    var chipIcon: String {
+        switch self {
+        case .fantasypros, .sportsdata: return "chart.line.uptrend.xyaxis"
+        case .reddit: return "bubble.left.and.bubble.right"
+        case .twitter, .bluesky: return "bird"
+        }
+    }
 }

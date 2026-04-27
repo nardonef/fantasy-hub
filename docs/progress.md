@@ -1,8 +1,8 @@
 # Fantasy League Hub — Progress Tracker
 
-> **Last updated**: 2026-04-13
-> **Current phase**: V2b — Intelligence Layer (active, post-QA enhancements)
-> **Goal**: Intelligence feed layer with signals from Reddit, FantasyPros, SportsDataIO; Feed/Picks tabs; player search and detail
+> **Last updated**: 2026-04-22
+> **Current phase**: V2c — Intel Tab Redesign (active)
+> **Goal**: Transform Intel tab from generic signal history into a personalized, actionable intelligence hub with typed cards, roster-aware news digest, and Twitter/Nitter ingestion
 
 ---
 
@@ -256,11 +256,13 @@
 - [ ] Add `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` to `api/.env` (create OAuth app at reddit.com/prefs/apps)
 - [x] Seed `Player` table with current NFL roster — `scripts/seed-players.ts` via Sleeper public API, 3090 players, position picks first fantasy-relevant value (handles two-way players like Travis Hunter)
 - [x] Tests: seed eligibility filter (6 unit), DB state post-seed (5 integration) — **32/32 passing across all test files**
-- [ ] Build Bluesky ingestion adapter (`src/ingestion/adapters/bluesky.ts`)
+- [x] Build Bluesky ingestion adapter (`src/ingestion/adapters/bluesky.ts`) — AT Protocol public API (no auth); 9 verified handles; dedup by `postUri`; graceful 400/error skip; registered in `ingest-signals.ts`
 - [x] Build SportsDataIO ingestion adapter (`src/ingestion/adapters/sportsdata.ts`) — weekly `PlayerGameStatsByWeek` stats; ≥5 PPR pt threshold; dedup by `playerId:season:week`; guarded by `SPORTSDATA_API_KEY` env var; offseason-safe (skips week 0 / week > 18)
 - [x] Tests: `buildContent` QB/WR/RB/edge (7 unit), `hasFantasyRelevantStats` (4 unit), `fetchSignals` offseason/dedup/threshold/error (6 unit) — **62/62 passing across all test files**
 - [x] Build FantasyPros scraping adapter (`src/ingestion/adapters/fantasypros.ts`) — scrapes `var ecrData` JSON from ECR page; deduplication via `player_id:date` key; registered in `ingest-signals.ts`; cron always scheduled (no credentials needed)
-- [x] Tests: FantasyPros `parseEcrData` (5 unit), `buildContent` (4 unit), `fetchSignals` dedup + error (3 unit) — **44/44 passing across all test files**
+- [x] **FantasyPros critical-moves redesign** — only surfaces signals when `|rankDelta| >= 10`; upserts daily `PlayerRankingSnapshot` for ALL players (powers ranking trend chart) regardless of signal emission
+- [x] `PlayerRankingSnapshot` Prisma table — `playerId + source + date` composite unique; `prisma db push` applied; relation added to `Player` model
+- [x] Tests: FantasyPros `parseEcrData` (4), `buildContent` (4), threshold filtering (5), snapshot upsert (2), dedup (3) — **167/167 passing across all test files**
 
 ### 2. API — Feed & Player Endpoints
 - [x] `GET /api/leagues/:leagueId/feed` — cursor-paginated signal stream; filters: source, type, playerId, limit; joined player data
@@ -269,7 +271,8 @@
 - [x] `GET /api/leagues/:leagueId/recommendations` — top players by signal activity (last 7 days); confidence = distinct source count
 - [x] `GET /api/players/search?q=` — case-insensitive name search, min 2 chars, max 10 results
 - [x] `GET /api/players/:playerId` — player profile + 50 most recent signals ordered by publishedAt
-- [x] Tests: feed (19 integration, including position + myRosterOnly), recommendations (4), search (6), player detail (4) — **90/90 passing across all test files**
+- [x] `GET /api/players/:playerId/ranking-history` — reads from `PlayerRankingSnapshot` (daily snapshots); returns one point per day per source, chronologically ordered; no weekly dedup needed
+- [x] Tests: feed (19 integration, including position + myRosterOnly), recommendations (4), search (6), player detail (4) — **167/167 passing across all test files**
 - [x] Backfilled `sleeperId` into `players.metadata` — `scripts/seed-players.ts` now stores Sleeper player IDs; re-run is idempotent
 - [x] `roster_players` table — Prisma schema + `prisma db push` applied; stores current-season roster per manager with slot (STARTER/BENCH/IR/TAXI) and FK to `players`
 - [x] `ProviderRosterPlayer` interface + optional `getCurrentRoster()` on `ProviderAdapter`
@@ -285,7 +288,7 @@
 - [x] `RecommendationCard` — 4-dot confidence meter (distinct source count); source chips; taps to PlayerDetailView
 - [x] `FeedFilterChip` — active/inactive states with tint color; icon support
 - [x] `PlayerSearchView` — debounced name search via `/api/players/search`; results list with position circles
-- [x] `PlayerDetailView` — position circle hero; signal count; chronological `PlayerSignalRow` feed; skeleton loading
+- [x] `PlayerDetailView` — position circle hero; signal count; `RankingTrendChart` (or skeleton/empty) between hero and signal feed; chronological `PlayerSignalRow` feed; ranking history loaded in parallel with player data
 - [x] Feed models added to `LeagueModels.swift`: `Signal`, `FeedPlayer`, `FeedResponse`, `RecommendationItem`, `LatestSignal`, `PlayerDetail`, `PlayerSignal`, `PlayerSearchResult`, `SignalSource`, `SignalType` enums
 - [x] Feed/player API methods added to `APIClient.swift`: `getFeed`, `getRecommendations`, `searchPlayers`, `getPlayer`
 - [x] `getFeed` updated with `position` and `myRosterOnly` params
@@ -313,6 +316,66 @@
 
 ---
 
+## V2c — Intel Tab Redesign (active)
+
+> Spec: `docs/features/intel-tab-redesign.md`
+
+### 1. Data Layer — Twitter/Nitter Adapter
+- [x] `TwitterAdapter` — Nitter RSS scraper for ~15 curated accounts (`api/src/ingestion/adapters/twitter.ts`)
+- [x] Register `TwitterAdapter` in `ingest-signals.ts`
+- [x] `TWITTER` added to `SignalSource` enum in Prisma schema + `prisma db push` applied
+- [ ] Tests: graceful degradation when Nitter unreachable, dedup by tweet ID (manual — requires Nitter connectivity)
+
+### 2. Intelligence Engine
+- [x] `signal-scorer.ts` — recency decay, source diversity, sentiment (`api/src/intelligence/signal-scorer.ts`)
+- [x] `card-generator.ts` — produces typed `IntelligenceCard[]` from signals + roster context (`api/src/intelligence/card-generator.ts`)
+- [x] Tests: 148/148 passing — signal scorer (recency, confidence, sentiment), card generator (card type selection, waiver eligibility, urgency order, cap at 5)
+
+### 3. API — Intelligence Endpoint
+- [x] `GET /api/leagues/:leagueId/intelligence` — returns `{ actionItems, rosterNews, leagueSignals }` (`api/src/routes/intelligence.ts`)
+- [x] Register route in `server.ts`
+- [ ] Integration test for intelligence route (next up)
+
+### 4. iOS — Redesigned Intel Tab
+- [x] `TWITTER` added to `SignalSource` enum with display name + accent color
+- [x] `IntelligenceCard` + `IntelligenceCardType` + `IntelligenceResponse` Codable types in `LeagueModels.swift`
+- [x] `fetchIntelligence(leagueId:weekOpponent:limit:cursor:)` in `APIClient.swift`
+- [x] `ActionItemCard.swift` — START_SIT (two-player) + single-player layouts with type-specific colors
+- [x] `RosterDigestView.swift` — roster-filtered signal section
+- [x] `IntelView.swift` — three-section root view (Action Items, Roster News, Around the League)
+- [x] Swap `FeedView` → `IntelView` in `MainTabView.swift`
+- [x] `xcodegen generate` run; **BUILD SUCCEEDED**
+- [x] Smoke test in simulator with live data
+
+### 5. Design Handoff — Today's Briefing + Player Detail Sheet ✅ COMPLETE
+
+> Design files: `docs/design_handoff_todays_briefing/`
+
+- [x] **Theme.swift extended** — added `bgElev1`, `bgElev2`, `textDim`, `textFaint`, `hairline`, `hairlineStrong`, `info`, `numDisplay`, `numStat` fonts, `radiusXL=20`; softened `win` (0x6FBF8A), `loss` (0xD96B6B), `tie` (0xD6B461); updated `positive`/`negative` aliases
+- [x] **New Codable types in `LeagueModels.swift`** — `TodaysBriefingResponse`, `BriefingTakeaway`, `TakeawayTag` (with `toneColor`), `SourceReference`, `PlayerAISummary`; optional `projectedPoints`/`ownershipPct`/`startPct` on `PlayerDetail`; `chipIcon` extension on `SignalSource`
+- [x] **APIClient methods** — `fetchBriefing(leagueId:)`, `fetchPlayerAISummary(playerId:leagueId:)`, stub `updateLineup(playerId:action:)`, stub `dropPlayer(playerId:)`
+- [x] **Backend stub endpoints** in `intelligence.ts` — `GET /:leagueId/briefing` (top-3 players by signal count, 5-min cache), `GET /:leagueId/players/:playerId/ai-summary` (static stub, 5-min cache)
+- [x] **`TodaysBriefingView.swift`** — Editorial variation: masthead (eyebrow + subtitle), lead card (gradient, tag badge, headline, rationale, source chips, projected delta, "Apply change →"), two numbered brief rows (gutter number + vertical rule, outlined tag badge, source chips), empty state, loading skeleton, toast feedback on Apply actions
+- [x] **`SourceChip.swift`** — shared pill chip (SF Symbol glyph + label, warmCream/0.06 bg, 0.5pt hairline border)
+- [x] **`ConfidenceDots.swift`** — 4-dot squircle scale with `accessibilityLabel`
+- [x] **`PlayerDetailView.swift` reworked** — sheet layout: grabber handle + Done/PLAYER·INTEL header; gradient header with position badge, name, AI verdict pill, matchup pill; 4-column numerals strip (PROJ/RANK/OWN%/START%); AI summary section; signal timeline with circular glyph rail + connector lines, italic for social sources; stub matchup card; sticky action bar (Bench/Trade/Drop/Mute with toast feedback); Mute persists via `UserDefaults`; parallel `async let` fetch for player + AI summary
+- [x] **`IntelMyTeamView.swift`** — replaced `actionItems: [IntelligenceCard]` input + `actionItemsSection` with `briefing: TodaysBriefingResponse?` + `TodaysBriefingView`
+- [x] **`IntelView.swift`** — added `briefing` state; concurrent `async let` fetch of intelligence + briefing; passes briefing to `IntelMyTeamView`
+- [x] **`xcodegen generate`** run; **BUILD SUCCEEDED**, 167/167 API tests passing
+- [x] **Simulator validated** — Today's Briefing renders with live stub data (3 player takeaways from signal feed), Player Detail sheet opens from takeaway tap, Bench/Trade/Drop/Mute action bar functional, Mute toggles to Unmute and persists, Done dismisses sheet
+
+### 6. Remaining / Stubs to Wire Up
+
+- [ ] **Numerals strip data** — PROJ/RANK/OWN%/START% all show `—`; need a data source (FantasyPros projected points, ownership API, or manual weekly seed). Add fields to `GET /api/players/:playerId` response.
+- [x] **Removed lineup mutation** — Bench/Drop buttons and `updateLineup`/`dropPlayer` API stubs removed; fantasy platforms (Yahoo, Sleeper, ESPN) don't expose lineup mutation APIs
+- [ ] **Real matchup card** — player detail sheet shows hardcoded "SF at SEA · Week 14"; wire to actual schedule data from the provider API
+- [ ] **AI summary** — body is always the placeholder string; replace with real LLM synthesis when V2 AI pipeline is ready (decision point: Claude vs OpenAI, RAG over signals)
+- [ ] **ADD / WATCH / TRADE actions** — tapping "Apply →" on those tag types shows a toast but doesn't navigate; build `WaiverClaimView(playerId:)` and `TradeProposalView(seedPlayerId:)` stubs
+- [ ] **Briefing quality** — stub endpoint ranks players by raw signal count; real implementation should use `signal-scorer.ts` weights + roster context + tag classification. Update `GET /:leagueId/briefing` to call `card-generator.ts` or equivalent.
+- [ ] **Broader app redesign** — `docs/design_handoff_todays_briefing/FantasyHub Audit.html` contains full audit of dashboard, analytics, standings, chat, and profile; none of those screens have been touched yet
+
+---
+
 ## V3 — Engagement (not started)
 
 - [ ] Trade analyzer
@@ -328,5 +391,5 @@
 - [x] **Roster as core data** — `roster_players` table stores current-season roster for all managers, synced as part of the league sync job. Both Sleeper and Yahoo supported. `roster.ts` reads from DB, no live API calls.
 - [ ] **Roster staleness indicator** — `syncedAt` is stored per row but the UI doesn't surface it. Could show "last updated X hours ago" or auto-trigger a roster refresh when > 24h stale.
 - [ ] **Reddit + SportsDataIO credentials** — add `REDDIT_CLIENT_ID/SECRET` and `SPORTSDATA_API_KEY` to `api/.env` to enable those adapters. Reddit: create OAuth app at reddit.com/prefs/apps. SportsDataIO: free tier key from sportsdata.io.
-- [ ] **Bluesky ingestion adapter** — stub planned, not implemented.
+- [x] **Bluesky ingestion adapter** — built and live (AT Protocol, 9 verified handles, 31 signals on first run).
 - [ ] **"My Roster" filter on Picks tab** — currently only applies to the Feed section. Picks (recommendations) always show all players.
