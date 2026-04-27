@@ -1,0 +1,3024 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>FantasyHub — Design Audit</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #f0eee9; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+    #root { height: 100%; }
+  </style>
+  <template id="__bundler_thumbnail">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+      <rect width="200" height="200" fill="#141312"/>
+      <text x="100" y="108" font-family="-apple-system,system-ui,sans-serif" font-size="42" font-weight="800" fill="#C9A96E" text-anchor="middle" letter-spacing="-1">FH</text>
+      <text x="100" y="140" font-family="-apple-system,system-ui,sans-serif" font-size="10" font-weight="600" fill="#E8E2D6" text-anchor="middle" letter-spacing="2">AUDIT</text>
+    </svg>
+  </template>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- ===== design-canvas.jsx ===== -->
+<script type="text/babel">
+
+// DesignCanvas.jsx — Figma-ish design canvas wrapper
+// Warm gray grid bg + Sections + Artboards + PostIt notes.
+// Artboards are reorderable (grip-drag), labels/titles are inline-editable,
+// and any artboard can be opened in a fullscreen focus overlay (←/→/Esc).
+// State persists to a .design-canvas.state.json sidecar via the host
+// bridge. No assets, no deps.
+//
+// Usage:
+//   <DesignCanvas>
+//     <DCSection id="onboarding" title="Onboarding" subtitle="First-run variants">
+//       <DCArtboard id="a" label="A · Dusk" width={260} height={480}>…</DCArtboard>
+//       <DCArtboard id="b" label="B · Minimal" width={260} height={480}>…</DCArtboard>
+//     </DCSection>
+//   </DesignCanvas>
+
+const DC = {
+  bg: '#f0eee9',
+  grid: 'rgba(0,0,0,0.06)',
+  label: 'rgba(60,50,40,0.7)',
+  title: 'rgba(40,30,20,0.85)',
+  subtitle: 'rgba(60,50,40,0.6)',
+  postitBg: '#fef4a8',
+  postitText: '#5a4a2a',
+  font: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+};
+
+// One-time CSS injection (classes are dc-prefixed so they don't collide with
+// the hosted design's own styles).
+if (typeof document !== 'undefined' && !document.getElementById('dc-styles')) {
+  const s = document.createElement('style');
+  s.id = 'dc-styles';
+  s.textContent = [
+    '.dc-editable{cursor:text;outline:none;white-space:nowrap;border-radius:3px;padding:0 2px;margin:0 -2px}',
+    '.dc-editable:focus{background:#fff;box-shadow:0 0 0 1.5px #c96442}',
+    '[data-dc-slot]{transition:transform .18s cubic-bezier(.2,.7,.3,1)}',
+    '[data-dc-slot].dc-dragging{transition:none;z-index:10;pointer-events:none}',
+    '[data-dc-slot].dc-dragging .dc-card{box-shadow:0 12px 40px rgba(0,0,0,.25),0 0 0 2px #c96442;transform:scale(1.02)}',
+    '.dc-card{transition:box-shadow .15s,transform .15s}',
+    '.dc-card *{scrollbar-width:none}',
+    '.dc-card *::-webkit-scrollbar{display:none}',
+    '.dc-labelrow{display:flex;align-items:center;gap:4px;height:24px}',
+    '.dc-grip{cursor:grab;display:flex;align-items:center;padding:5px 4px;border-radius:4px;transition:background .12s}',
+    '.dc-grip:hover{background:rgba(0,0,0,.08)}',
+    '.dc-grip:active{cursor:grabbing}',
+    '.dc-labeltext{cursor:pointer;border-radius:4px;padding:3px 6px;display:flex;align-items:center;transition:background .12s}',
+    '.dc-labeltext:hover{background:rgba(0,0,0,.05)}',
+    '.dc-expand{position:absolute;bottom:100%;right:0;margin-bottom:5px;z-index:2;opacity:0;transition:opacity .12s,background .12s;',
+    '  width:22px;height:22px;border-radius:5px;border:none;cursor:pointer;padding:0;',
+    '  background:transparent;color:rgba(60,50,40,.7);display:flex;align-items:center;justify-content:center}',
+    '.dc-expand:hover{background:rgba(0,0,0,.06);color:#2a251f}',
+    '[data-dc-slot]:hover .dc-expand{opacity:1}',
+  ].join('\n');
+  document.head.appendChild(s);
+}
+
+const DCCtx = React.createContext(null);
+
+// ─────────────────────────────────────────────────────────────
+// DesignCanvas — stateful wrapper around the pan/zoom viewport.
+// Owns runtime state (per-section order, renamed titles/labels, focused
+// artboard). Order/titles/labels persist to a .design-canvas.state.json
+// sidecar next to the HTML. Reads go via plain fetch() so the saved
+// arrangement is visible anywhere the HTML + sidecar are served together
+// (omelette preview, direct link, downloaded zip). Writes go through the
+// host's window.omelette bridge — editing requires the omelette runtime.
+// Focus is ephemeral.
+// ─────────────────────────────────────────────────────────────
+const DC_STATE_FILE = '.design-canvas.state.json';
+
+function DesignCanvas({ children, minScale, maxScale, style }) {
+  const [state, setState] = React.useState({ sections: {}, focus: null });
+  // Hold rendering until the sidecar read settles so the saved order/titles
+  // appear on first paint (no source-order flash). didRead gates writes until
+  // the read settles so the empty initial state can't clobber a slow read;
+  // skipNextWrite suppresses the one echo-write that would otherwise follow
+  // hydration.
+  const [ready, setReady] = React.useState(false);
+  const didRead = React.useRef(false);
+  const skipNextWrite = React.useRef(false);
+
+  React.useEffect(() => {
+    let off = false;
+    fetch('./' + DC_STATE_FILE)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((saved) => {
+        if (off || !saved || !saved.sections) return;
+        skipNextWrite.current = true;
+        setState((s) => ({ ...s, sections: saved.sections }));
+      })
+      .catch(() => {})
+      .finally(() => { didRead.current = true; if (!off) setReady(true); });
+    const t = setTimeout(() => { if (!off) setReady(true); }, 150);
+    return () => { off = true; clearTimeout(t); };
+  }, []);
+
+  React.useEffect(() => {
+    if (!didRead.current) return;
+    if (skipNextWrite.current) { skipNextWrite.current = false; return; }
+    const t = setTimeout(() => {
+      window.omelette?.writeFile(DC_STATE_FILE, JSON.stringify({ sections: state.sections })).catch(() => {});
+    }, 250);
+    return () => clearTimeout(t);
+  }, [state.sections]);
+
+  // Build registries synchronously from children so FocusOverlay can read
+  // them in the same render. Only direct DCSection > DCArtboard children are
+  // walked — wrapping them in other elements opts out of focus/reorder.
+  const registry = {};     // slotId -> { sectionId, artboard }
+  const sectionMeta = {};  // sectionId -> { title, subtitle, slotIds[] }
+  const sectionOrder = [];
+  React.Children.forEach(children, (sec) => {
+    if (!sec || sec.type !== DCSection) return;
+    const sid = sec.props.id ?? sec.props.title;
+    if (!sid) return;
+    sectionOrder.push(sid);
+    const persisted = state.sections[sid] || {};
+    const srcIds = [];
+    React.Children.forEach(sec.props.children, (ab) => {
+      if (!ab || ab.type !== DCArtboard) return;
+      const aid = ab.props.id ?? ab.props.label;
+      if (!aid) return;
+      registry[`${sid}/${aid}`] = { sectionId: sid, artboard: ab };
+      srcIds.push(aid);
+    });
+    const kept = (persisted.order || []).filter((k) => srcIds.includes(k));
+    sectionMeta[sid] = {
+      title: persisted.title ?? sec.props.title,
+      subtitle: sec.props.subtitle,
+      slotIds: [...kept, ...srcIds.filter((k) => !kept.includes(k))],
+    };
+  });
+
+  const api = React.useMemo(() => ({
+    state,
+    section: (id) => state.sections[id] || {},
+    patchSection: (id, p) => setState((s) => ({
+      ...s,
+      sections: { ...s.sections, [id]: { ...s.sections[id], ...(typeof p === 'function' ? p(s.sections[id] || {}) : p) } },
+    })),
+    setFocus: (slotId) => setState((s) => ({ ...s, focus: slotId })),
+  }), [state]);
+
+  // Esc exits focus; any outside pointerdown commits an in-progress rename.
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') api.setFocus(null); };
+    const onPd = (e) => {
+      const ae = document.activeElement;
+      if (ae && ae.isContentEditable && !ae.contains(e.target)) ae.blur();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPd, true);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPd, true);
+    };
+  }, [api]);
+
+  return (
+    <DCCtx.Provider value={api}>
+      <DCViewport minScale={minScale} maxScale={maxScale} style={style}>{ready && children}</DCViewport>
+      {state.focus && registry[state.focus] && (
+        <DCFocusOverlay entry={registry[state.focus]} sectionMeta={sectionMeta} sectionOrder={sectionOrder} />
+      )}
+    </DCCtx.Provider>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DCViewport — transform-based pan/zoom (internal)
+//
+// Input mapping (Figma-style):
+//   • trackpad pinch  → zoom   (ctrlKey wheel; Safari gesture* events)
+//   • trackpad scroll → pan    (two-finger)
+//   • mouse wheel     → zoom   (notched; distinguished from trackpad scroll)
+//   • middle-drag / primary-drag-on-bg → pan
+//
+// Transform state lives in a ref and is written straight to the DOM
+// (translate3d + will-change) so wheel ticks don't go through React —
+// keeps pans at 60fps on dense canvases.
+// ─────────────────────────────────────────────────────────────
+function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
+  const vpRef = React.useRef(null);
+  const worldRef = React.useRef(null);
+  const tf = React.useRef({ x: 0, y: 0, scale: 1 });
+
+  const apply = React.useCallback(() => {
+    const { x, y, scale } = tf.current;
+    const el = worldRef.current;
+    if (el) el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+  }, []);
+
+  React.useEffect(() => {
+    const vp = vpRef.current;
+    if (!vp) return;
+
+    const zoomAt = (cx, cy, factor) => {
+      const r = vp.getBoundingClientRect();
+      const px = cx - r.left, py = cy - r.top;
+      const t = tf.current;
+      const next = Math.min(maxScale, Math.max(minScale, t.scale * factor));
+      const k = next / t.scale;
+      // keep the world point under the cursor fixed
+      t.x = px - (px - t.x) * k;
+      t.y = py - (py - t.y) * k;
+      t.scale = next;
+      apply();
+    };
+
+    // Mouse-wheel vs trackpad-scroll heuristic. A physical wheel sends
+    // line-mode deltas (Firefox) or large integer pixel deltas with no X
+    // component (Chrome/Safari, typically multiples of 100/120). Trackpad
+    // two-finger scroll sends small/fractional pixel deltas, often with
+    // non-zero deltaX. ctrlKey is set by the browser for trackpad pinch.
+    const isMouseWheel = (e) =>
+      e.deltaMode !== 0 ||
+      (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 40);
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      if (isGesturing) return; // Safari: gesture* owns the pinch — discard concurrent wheels
+      if (e.ctrlKey) {
+        // trackpad pinch (or explicit ctrl+wheel)
+        zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
+      } else if (isMouseWheel(e)) {
+        // notched mouse wheel — fixed-ratio step per click
+        zoomAt(e.clientX, e.clientY, Math.exp(-Math.sign(e.deltaY) * 0.18));
+      } else {
+        // trackpad two-finger scroll — pan
+        tf.current.x -= e.deltaX;
+        tf.current.y -= e.deltaY;
+        apply();
+      }
+    };
+
+    // Safari sends native gesture* events for trackpad pinch with a smooth
+    // e.scale; preferring these over the ctrl+wheel fallback gives a much
+    // better feel there. No-ops on other browsers. Safari also fires
+    // ctrlKey wheel events during the same pinch — isGesturing makes
+    // onWheel drop those entirely so they neither zoom nor pan.
+    let gsBase = 1;
+    let isGesturing = false;
+    const onGestureStart = (e) => { e.preventDefault(); isGesturing = true; gsBase = tf.current.scale; };
+    const onGestureChange = (e) => {
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, (gsBase * e.scale) / tf.current.scale);
+    };
+    const onGestureEnd = (e) => { e.preventDefault(); isGesturing = false; };
+
+    // Drag-pan: middle button anywhere, or primary button on canvas
+    // background (anything that isn't an artboard or an inline editor).
+    let drag = null;
+    const onPointerDown = (e) => {
+      const onBg = !e.target.closest('[data-dc-slot], .dc-editable');
+      if (!(e.button === 1 || (e.button === 0 && onBg))) return;
+      e.preventDefault();
+      vp.setPointerCapture(e.pointerId);
+      drag = { id: e.pointerId, lx: e.clientX, ly: e.clientY };
+      vp.style.cursor = 'grabbing';
+    };
+    const onPointerMove = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      tf.current.x += e.clientX - drag.lx;
+      tf.current.y += e.clientY - drag.ly;
+      drag.lx = e.clientX; drag.ly = e.clientY;
+      apply();
+    };
+    const onPointerUp = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      vp.releasePointerCapture(e.pointerId);
+      drag = null;
+      vp.style.cursor = '';
+    };
+
+    vp.addEventListener('wheel', onWheel, { passive: false });
+    vp.addEventListener('gesturestart', onGestureStart, { passive: false });
+    vp.addEventListener('gesturechange', onGestureChange, { passive: false });
+    vp.addEventListener('gestureend', onGestureEnd, { passive: false });
+    vp.addEventListener('pointerdown', onPointerDown);
+    vp.addEventListener('pointermove', onPointerMove);
+    vp.addEventListener('pointerup', onPointerUp);
+    vp.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      vp.removeEventListener('wheel', onWheel);
+      vp.removeEventListener('gesturestart', onGestureStart);
+      vp.removeEventListener('gesturechange', onGestureChange);
+      vp.removeEventListener('gestureend', onGestureEnd);
+      vp.removeEventListener('pointerdown', onPointerDown);
+      vp.removeEventListener('pointermove', onPointerMove);
+      vp.removeEventListener('pointerup', onPointerUp);
+      vp.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [apply, minScale, maxScale]);
+
+  const gridSvg = `url("data:image/svg+xml,%3Csvg width='120' height='120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M120 0H0v120' fill='none' stroke='${encodeURIComponent(DC.grid)}' stroke-width='1'/%3E%3C/svg%3E")`;
+  return (
+    <div
+      ref={vpRef}
+      className="design-canvas"
+      style={{
+        height: '100vh', width: '100vw',
+        background: DC.bg,
+        overflow: 'hidden',
+        overscrollBehavior: 'none',
+        touchAction: 'none',
+        position: 'relative',
+        fontFamily: DC.font,
+        boxSizing: 'border-box',
+        ...style,
+      }}
+    >
+      <div
+        ref={worldRef}
+        style={{
+          position: 'absolute', top: 0, left: 0,
+          transformOrigin: '0 0',
+          willChange: 'transform',
+          width: 'max-content', minWidth: '100%',
+          minHeight: '100%',
+          padding: '60px 0 80px',
+        }}
+      >
+        <div style={{ position: 'absolute', inset: -6000, backgroundImage: gridSvg, backgroundSize: '120px 120px', pointerEvents: 'none', zIndex: -1 }} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DCSection — editable title + h-row of artboards in persisted order
+// ─────────────────────────────────────────────────────────────
+function DCSection({ id, title, subtitle, children, gap = 48 }) {
+  const ctx = React.useContext(DCCtx);
+  const sid = id ?? title;
+  const all = React.Children.toArray(children);
+  const artboards = all.filter((c) => c && c.type === DCArtboard);
+  const rest = all.filter((c) => !(c && c.type === DCArtboard));
+  const srcOrder = artboards.map((a) => a.props.id ?? a.props.label);
+  const sec = (ctx && sid && ctx.section(sid)) || {};
+
+  const order = React.useMemo(() => {
+    const kept = (sec.order || []).filter((k) => srcOrder.includes(k));
+    return [...kept, ...srcOrder.filter((k) => !kept.includes(k))];
+  }, [sec.order, srcOrder.join('|')]);
+
+  const byId = Object.fromEntries(artboards.map((a) => [a.props.id ?? a.props.label, a]));
+
+  return (
+    <div data-dc-section={sid} style={{ marginBottom: 80, position: 'relative' }}>
+      <div style={{ padding: '0 60px 56px' }}>
+        <DCEditable tag="div" value={sec.title ?? title}
+          onChange={(v) => ctx && sid && ctx.patchSection(sid, { title: v })}
+          style={{ fontSize: 28, fontWeight: 600, color: DC.title, letterSpacing: -0.4, marginBottom: 6, display: 'inline-block' }} />
+        {subtitle && <div style={{ fontSize: 16, color: DC.subtitle }}>{subtitle}</div>}
+      </div>
+      <div style={{ display: 'flex', gap, padding: '0 60px', alignItems: 'flex-start', width: 'max-content' }}>
+        {order.map((k) => (
+          <DCArtboardFrame key={k} sectionId={sid} artboard={byId[k]} order={order}
+            label={(sec.labels || {})[k] ?? byId[k].props.label}
+            onRename={(v) => ctx && ctx.patchSection(sid, (x) => ({ labels: { ...x.labels, [k]: v } }))}
+            onReorder={(next) => ctx && ctx.patchSection(sid, { order: next })}
+            onFocus={() => ctx && ctx.setFocus(`${sid}/${k}`)} />
+        ))}
+      </div>
+      {rest}
+    </div>
+  );
+}
+
+// DCArtboard — marker; rendered by DCArtboardFrame via DCSection.
+function DCArtboard() { return null; }
+
+function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorder, onFocus }) {
+  const { id: rawId, label: rawLabel, width = 260, height = 480, children, style = {} } = artboard.props;
+  const id = rawId ?? rawLabel;
+  const ref = React.useRef(null);
+
+  // Live drag-reorder: dragged card sticks to cursor; siblings slide into
+  // their would-be slots in real time via transforms. DOM order only
+  // changes on drop.
+  const onGripDown = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const me = ref.current;
+    // translateX is applied in local (pre-scale) space but pointer deltas and
+    // getBoundingClientRect().left are screen-space — divide by the viewport's
+    // current scale so the dragged card tracks the cursor at any zoom level.
+    const scale = me.getBoundingClientRect().width / me.offsetWidth || 1;
+    const peers = Array.from(document.querySelectorAll(`[data-dc-section="${sectionId}"] [data-dc-slot]`));
+    const homes = peers.map((el) => ({ el, id: el.dataset.dcSlot, x: el.getBoundingClientRect().left }));
+    const slotXs = homes.map((h) => h.x);
+    const startIdx = order.indexOf(id);
+    const startX = e.clientX;
+    let liveOrder = order.slice();
+    me.classList.add('dc-dragging');
+
+    const layout = () => {
+      for (const h of homes) {
+        if (h.id === id) continue;
+        const slot = liveOrder.indexOf(h.id);
+        h.el.style.transform = `translateX(${(slotXs[slot] - h.x) / scale}px)`;
+      }
+    };
+
+    const move = (ev) => {
+      const dx = ev.clientX - startX;
+      me.style.transform = `translateX(${dx / scale}px)`;
+      const cur = homes[startIdx].x + dx;
+      let nearest = 0, best = Infinity;
+      for (let i = 0; i < slotXs.length; i++) {
+        const d = Math.abs(slotXs[i] - cur);
+        if (d < best) { best = d; nearest = i; }
+      }
+      if (liveOrder.indexOf(id) !== nearest) {
+        liveOrder = order.filter((k) => k !== id);
+        liveOrder.splice(nearest, 0, id);
+        layout();
+      }
+    };
+
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      const finalSlot = liveOrder.indexOf(id);
+      me.classList.remove('dc-dragging');
+      me.style.transform = `translateX(${(slotXs[finalSlot] - homes[startIdx].x) / scale}px)`;
+      // After the settle transition, kill transitions + clear transforms +
+      // commit the reorder in the same frame so there's no visual snap-back.
+      setTimeout(() => {
+        for (const h of homes) { h.el.style.transition = 'none'; h.el.style.transform = ''; }
+        if (liveOrder.join('|') !== order.join('|')) onReorder(liveOrder);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          for (const h of homes) h.el.style.transition = '';
+        }));
+      }, 180);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  };
+
+  return (
+    <div ref={ref} data-dc-slot={id} style={{ position: 'relative', flexShrink: 0 }}>
+      <div className="dc-labelrow" style={{ position: 'absolute', bottom: '100%', left: -4, marginBottom: 4, color: DC.label }}>
+        <div className="dc-grip" onPointerDown={onGripDown} title="Drag to reorder">
+          <svg width="9" height="13" viewBox="0 0 9 13" fill="currentColor"><circle cx="2" cy="2" r="1.1"/><circle cx="7" cy="2" r="1.1"/><circle cx="2" cy="6.5" r="1.1"/><circle cx="7" cy="6.5" r="1.1"/><circle cx="2" cy="11" r="1.1"/><circle cx="7" cy="11" r="1.1"/></svg>
+        </div>
+        <div className="dc-labeltext" onClick={onFocus} title="Click to focus">
+          <DCEditable value={label} onChange={onRename} onClick={(e) => e.stopPropagation()}
+            style={{ fontSize: 15, fontWeight: 500, color: DC.label, lineHeight: 1 }} />
+        </div>
+      </div>
+      <button className="dc-expand" onClick={onFocus} onPointerDown={(e) => e.stopPropagation()} title="Focus">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M7 1h4v4M5 11H1V7M11 1L7.5 4.5M1 11l3.5-3.5"/></svg>
+      </button>
+      <div className="dc-card"
+        style={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06)', overflow: 'hidden', width, height, background: '#fff', ...style }}>
+        {children || <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 13, fontFamily: DC.font }}>{id}</div>}
+      </div>
+    </div>
+  );
+}
+
+// Inline rename — commits on blur or Enter.
+function DCEditable({ value, onChange, style, tag = 'span', onClick }) {
+  const T = tag;
+  return (
+    <T className="dc-editable" contentEditable suppressContentEditableWarning
+      onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      onBlur={(e) => onChange && onChange(e.currentTarget.textContent)}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+      style={style}>{value}</T>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Focus mode — overlay one artboard; ←/→ within section, ↑/↓ across
+// sections, Esc or backdrop click to exit.
+// ─────────────────────────────────────────────────────────────
+function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
+  const ctx = React.useContext(DCCtx);
+  const { sectionId, artboard } = entry;
+  const sec = ctx.section(sectionId);
+  const meta = sectionMeta[sectionId];
+  const peers = meta.slotIds;
+  const aid = artboard.props.id ?? artboard.props.label;
+  const idx = peers.indexOf(aid);
+  const secIdx = sectionOrder.indexOf(sectionId);
+
+  const go = (d) => { const n = peers[(idx + d + peers.length) % peers.length]; if (n) ctx.setFocus(`${sectionId}/${n}`); };
+  const goSection = (d) => {
+    const ns = sectionOrder[(secIdx + d + sectionOrder.length) % sectionOrder.length];
+    const first = sectionMeta[ns] && sectionMeta[ns].slotIds[0];
+    if (first) ctx.setFocus(`${ns}/${first}`);
+  };
+
+  React.useEffect(() => {
+    const k = (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); goSection(-1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); goSection(1); }
+    };
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  });
+
+  const { width = 260, height = 480, children } = artboard.props;
+  const [vp, setVp] = React.useState({ w: window.innerWidth, h: window.innerHeight });
+  React.useEffect(() => { const r = () => setVp({ w: window.innerWidth, h: window.innerHeight }); window.addEventListener('resize', r); return () => window.removeEventListener('resize', r); }, []);
+  const scale = Math.max(0.1, Math.min((vp.w - 200) / width, (vp.h - 260) / height, 2));
+
+  const [ddOpen, setDd] = React.useState(false);
+  const Arrow = ({ dir, onClick }) => (
+    <button onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{ position: 'absolute', top: '50%', [dir]: 28, transform: 'translateY(-50%)',
+        border: 'none', background: 'rgba(255,255,255,.08)', color: 'rgba(255,255,255,.9)',
+        width: 44, height: 44, borderRadius: 22, fontSize: 18, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .15s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.18)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.08)')}>
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d={dir === 'left' ? 'M11 3L5 9l6 6' : 'M7 3l6 6-6 6'} /></svg>
+    </button>
+  );
+
+  // Portal to body so position:fixed is the real viewport regardless of any
+  // transform on DesignCanvas's ancestors (including the canvas zoom itself).
+  return ReactDOM.createPortal(
+    <div onClick={() => ctx.setFocus(null)}
+      onWheel={(e) => e.preventDefault()}
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(24,20,16,.6)', backdropFilter: 'blur(14px)',
+        fontFamily: DC.font, color: '#fff' }}>
+
+      {/* top bar: section dropdown (left) · close (right) */}
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 72, display: 'flex', alignItems: 'flex-start', padding: '16px 20px 0', gap: 16 }}>
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setDd((o) => !o)}
+            style={{ border: 'none', background: 'transparent', color: '#fff', cursor: 'pointer', padding: '6px 8px',
+              borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.3 }}>{meta.title}</span>
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ opacity: .7 }}><path d="M2 4l3.5 3.5L9 4"/></svg>
+            </span>
+            {meta.subtitle && <span style={{ display: 'block', fontSize: 13, opacity: .6, fontWeight: 400, marginTop: 2 }}>{meta.subtitle}</span>}
+          </button>
+          {ddOpen && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: '#2a251f', borderRadius: 8,
+              boxShadow: '0 8px 32px rgba(0,0,0,.4)', padding: 4, minWidth: 200, zIndex: 10 }}>
+              {sectionOrder.map((sid) => (
+                <button key={sid} onClick={() => { setDd(false); const f = sectionMeta[sid].slotIds[0]; if (f) ctx.setFocus(`${sid}/${f}`); }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
+                    background: sid === sectionId ? 'rgba(255,255,255,.1)' : 'transparent', color: '#fff',
+                    padding: '8px 12px', borderRadius: 5, fontSize: 14, fontWeight: sid === sectionId ? 600 : 400, fontFamily: 'inherit' }}>
+                  {sectionMeta[sid].title}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => ctx.setFocus(null)}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.12)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,.7)', width: 32, height: 32,
+            borderRadius: 16, fontSize: 20, cursor: 'pointer', lineHeight: 1, transition: 'background .12s' }}>×</button>
+      </div>
+
+      {/* card centered, label + index below — only the card itself stops
+          propagation so any backdrop click (including the margins around
+          the card) exits focus */}
+      <div
+        style={{ position: 'absolute', top: 64, bottom: 56, left: 100, right: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ width: width * scale, height: height * scale, position: 'relative' }}>
+          <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left', background: '#fff', borderRadius: 2, overflow: 'hidden',
+            boxShadow: '0 20px 80px rgba(0,0,0,.4)' }}>
+            {children || <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb' }}>{aid}</div>}
+          </div>
+        </div>
+        <div onClick={(e) => e.stopPropagation()} style={{ fontSize: 14, fontWeight: 500, opacity: .85, textAlign: 'center' }}>
+          {(sec.labels || {})[aid] ?? artboard.props.label}
+          <span style={{ opacity: .5, marginLeft: 10, fontVariantNumeric: 'tabular-nums' }}>{idx + 1} / {peers.length}</span>
+        </div>
+      </div>
+
+      <Arrow dir="left" onClick={() => go(-1)} />
+      <Arrow dir="right" onClick={() => go(1)} />
+
+      {/* dots */}
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
+        {peers.map((p, i) => (
+          <button key={p} onClick={() => ctx.setFocus(`${sectionId}/${p}`)}
+            style={{ border: 'none', padding: 0, cursor: 'pointer', width: 6, height: 6, borderRadius: 3,
+              background: i === idx ? '#fff' : 'rgba(255,255,255,.3)' }} />
+        ))}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Post-it — absolute-positioned sticky note
+// ─────────────────────────────────────────────────────────────
+function DCPostIt({ children, top, left, right, bottom, rotate = -2, width = 180 }) {
+  return (
+    <div style={{
+      position: 'absolute', top, left, right, bottom, width,
+      background: DC.postitBg, padding: '14px 16px',
+      fontFamily: '"Comic Sans MS", "Marker Felt", "Segoe Print", cursive',
+      fontSize: 14, lineHeight: 1.4, color: DC.postitText,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+      transform: `rotate(${rotate}deg)`,
+      zIndex: 5,
+    }}>{children}</div>
+  );
+}
+
+Object.assign(window, { DesignCanvas, DCSection, DCArtboard, DCPostIt });
+
+
+</script>
+
+<!-- ===== ios-frame.jsx ===== -->
+<script type="text/babel">
+
+// iOS.jsx — Simplified iOS 26 (Liquid Glass) device frame
+// Based on the iOS 26 UI Kit + Figma status bar spec. No assets, no deps.
+// Exports: IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard
+
+// ─────────────────────────────────────────────────────────────
+// Status bar
+// ─────────────────────────────────────────────────────────────
+function IOSStatusBar({ dark = false, time = '9:41' }) {
+  const c = dark ? '#fff' : '#000';
+  return (
+    <div style={{
+      display: 'flex', gap: 154, alignItems: 'center', justifyContent: 'center',
+      padding: '21px 24px 19px', boxSizing: 'border-box',
+      position: 'relative', zIndex: 20, width: '100%',
+    }}>
+      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 1.5 }}>
+        <span style={{
+          fontFamily: '-apple-system, "SF Pro", system-ui', fontWeight: 590,
+          fontSize: 17, lineHeight: '22px', color: c,
+        }}>{time}</span>
+      </div>
+      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 1, paddingRight: 1 }}>
+        <svg width="19" height="12" viewBox="0 0 19 12">
+          <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill={c}/>
+          <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill={c}/>
+          <rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill={c}/>
+          <rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill={c}/>
+        </svg>
+        <svg width="17" height="12" viewBox="0 0 17 12">
+          <path d="M8.5 3.2C10.8 3.2 12.9 4.1 14.4 5.6L15.5 4.5C13.7 2.7 11.2 1.5 8.5 1.5C5.8 1.5 3.3 2.7 1.5 4.5L2.6 5.6C4.1 4.1 6.2 3.2 8.5 3.2Z" fill={c}/>
+          <path d="M8.5 6.8C9.9 6.8 11.1 7.3 12 8.2L13.1 7.1C11.8 5.9 10.2 5.1 8.5 5.1C6.8 5.1 5.2 5.9 3.9 7.1L5 8.2C5.9 7.3 7.1 6.8 8.5 6.8Z" fill={c}/>
+          <circle cx="8.5" cy="10.5" r="1.5" fill={c}/>
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13">
+          <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke={c} strokeOpacity="0.35" fill="none"/>
+          <rect x="2" y="2" width="20" height="9" rx="2" fill={c}/>
+          <path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill={c} fillOpacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Liquid glass pill — blur + tint + shine
+// ─────────────────────────────────────────────────────────────
+function IOSGlassPill({ children, dark = false, style = {} }) {
+  return (
+    <div style={{
+      height: 44, minWidth: 44, borderRadius: 9999,
+      position: 'relative', overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: dark
+        ? '0 2px 6px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.2)'
+        : '0 1px 3px rgba(0,0,0,0.07), 0 3px 10px rgba(0,0,0,0.06)',
+      ...style,
+    }}>
+      {/* blur + tint */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 9999,
+        backdropFilter: 'blur(12px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+        background: dark ? 'rgba(120,120,128,0.28)' : 'rgba(255,255,255,0.5)',
+      }} />
+      {/* shine */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 9999,
+        boxShadow: dark
+          ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15), inset -1px -1px 1px rgba(255,255,255,0.08)'
+          : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+        border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+      }} />
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Navigation bar — glass pills + large title
+// ─────────────────────────────────────────────────────────────
+function IOSNavBar({ title = 'Title', dark = false, trailingIcon = true }) {
+  const muted = dark ? 'rgba(255,255,255,0.6)' : '#404040';
+  const text = dark ? '#fff' : '#000';
+  const pillIcon = (content) => (
+    <IOSGlassPill dark={dark}>
+      <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {content}
+      </div>
+    </IOSGlassPill>
+  );
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10,
+      paddingTop: 62, paddingBottom: 10, position: 'relative', zIndex: 5,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px',
+      }}>
+        {/* back chevron */}
+        {pillIcon(
+          <svg width="12" height="20" viewBox="0 0 12 20" fill="none" style={{ marginLeft: -1 }}>
+            <path d="M10 2L2 10l8 8" stroke={muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+        {/* trailing ellipsis */}
+        {trailingIcon && pillIcon(
+          <svg width="22" height="6" viewBox="0 0 22 6">
+            <circle cx="3" cy="3" r="2.5" fill={muted}/>
+            <circle cx="11" cy="3" r="2.5" fill={muted}/>
+            <circle cx="19" cy="3" r="2.5" fill={muted}/>
+          </svg>
+        )}
+      </div>
+      {/* large title */}
+      <div style={{
+        padding: '0 16px',
+        fontFamily: '-apple-system, system-ui',
+        fontSize: 34, fontWeight: 700, lineHeight: '41px',
+        color: text, letterSpacing: 0.4,
+      }}>{title}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Grouped list (inset card, r:26) + row (52px)
+// ─────────────────────────────────────────────────────────────
+function IOSListRow({ title, detail, icon, chevron = true, isLast = false, dark = false }) {
+  const text = dark ? '#fff' : '#000';
+  const sec = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const ter = dark ? 'rgba(235,235,245,0.3)' : 'rgba(60,60,67,0.3)';
+  const sep = dark ? 'rgba(84,84,88,0.65)' : 'rgba(60,60,67,0.12)';
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', minHeight: 52,
+      padding: '0 16px', position: 'relative',
+      fontFamily: '-apple-system, system-ui', fontSize: 17,
+      letterSpacing: -0.43,
+    }}>
+      {icon && (
+        <div style={{
+          width: 30, height: 30, borderRadius: 7, background: icon,
+          marginRight: 12, flexShrink: 0,
+        }} />
+      )}
+      <div style={{ flex: 1, color: text }}>{title}</div>
+      {detail && <span style={{ color: sec, marginRight: 6 }}>{detail}</span>}
+      {chevron && (
+        <svg width="8" height="14" viewBox="0 0 8 14" style={{ flexShrink: 0 }}>
+          <path d="M1 1l6 6-6 6" stroke={ter} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+      {!isLast && (
+        <div style={{
+          position: 'absolute', bottom: 0, right: 0,
+          left: icon ? 58 : 16, height: 0.5, background: sep,
+        }} />
+      )}
+    </div>
+  );
+}
+
+function IOSList({ header, children, dark = false }) {
+  const hc = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const bg = dark ? '#1C1C1E' : '#fff';
+  return (
+    <div>
+      {header && (
+        <div style={{
+          fontFamily: '-apple-system, system-ui', fontSize: 13,
+          color: hc, textTransform: 'uppercase',
+          padding: '8px 36px 6px', letterSpacing: -0.08,
+        }}>{header}</div>
+      )}
+      <div style={{
+        background: bg, borderRadius: 26,
+        margin: '0 16px', overflow: 'hidden',
+      }}>{children}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Device frame
+// ─────────────────────────────────────────────────────────────
+function IOSDevice({
+  children, width = 402, height = 874, dark = false,
+  title, keyboard = false,
+}) {
+  return (
+    <div style={{
+      width, height, borderRadius: 48, overflow: 'hidden',
+      position: 'relative', background: dark ? '#000' : '#F2F2F7',
+      boxShadow: '0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12)',
+      fontFamily: '-apple-system, system-ui, sans-serif',
+      WebkitFontSmoothing: 'antialiased',
+    }}>
+      {/* dynamic island */}
+      <div style={{
+        position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+        width: 126, height: 37, borderRadius: 24, background: '#000', zIndex: 50,
+      }} />
+      {/* status bar (absolute) */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+        <IOSStatusBar dark={dark} />
+      </div>
+      {/* nav + content */}
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {title !== undefined && <IOSNavBar title={title} dark={dark} />}
+        <div style={{ flex: 1, overflow: 'auto' }}>{children}</div>
+        {keyboard && <IOSKeyboard dark={dark} />}
+      </div>
+      {/* home indicator — always on top */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 60,
+        height: 34, display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
+        paddingBottom: 8, pointerEvents: 'none',
+      }}>
+        <div style={{
+          width: 139, height: 5, borderRadius: 100,
+          background: dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.25)',
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Keyboard — iOS 26 liquid glass
+// ─────────────────────────────────────────────────────────────
+function IOSKeyboard({ dark = false }) {
+  const glyph = dark ? 'rgba(255,255,255,0.7)' : '#595959';
+  const sugg = dark ? 'rgba(255,255,255,0.6)' : '#333';
+  const keyBg = dark ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.85)';
+
+  // special-key icons
+  const icons = {
+    shift: <svg width="19" height="17" viewBox="0 0 19 17"><path d="M9.5 1L1 9.5h4.5V16h8V9.5H18L9.5 1z" fill={glyph}/></svg>,
+    del: <svg width="23" height="17" viewBox="0 0 23 17"><path d="M7 1h13a2 2 0 012 2v11a2 2 0 01-2 2H7l-6-7.5L7 1z" fill="none" stroke={glyph} strokeWidth="1.6" strokeLinejoin="round"/><path d="M10 5l7 7M17 5l-7 7" stroke={glyph} strokeWidth="1.6" strokeLinecap="round"/></svg>,
+    ret: <svg width="20" height="14" viewBox="0 0 20 14"><path d="M18 1v6H4m0 0l4-4M4 7l4 4" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  };
+
+  const key = (content, { w, flex, ret, fs = 25, k } = {}) => (
+    <div key={k} style={{
+      height: 42, borderRadius: 8.5,
+      flex: flex ? 1 : undefined, width: w, minWidth: 0,
+      background: ret ? '#08f' : keyBg,
+      boxShadow: '0 1px 0 rgba(0,0,0,0.075)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: '-apple-system, "SF Compact", system-ui',
+      fontSize: fs, fontWeight: 458, color: ret ? '#fff' : glyph,
+    }}>{content}</div>
+  );
+
+  const row = (keys, pad = 0) => (
+    <div style={{ display: 'flex', gap: 6.5, justifyContent: 'center', padding: `0 ${pad}px` }}>
+      {keys.map(l => key(l, { flex: true, k: l }))}
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: 'relative', zIndex: 15, borderRadius: 27, overflow: 'hidden',
+      padding: '11px 0 2px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      boxShadow: dark
+        ? '0 -2px 20px rgba(0,0,0,0.09)'
+        : '0 -1px 6px rgba(0,0,0,0.018), 0 -3px 20px rgba(0,0,0,0.012)',
+    }}>
+      {/* liquid glass bg — same recipe as nav pills */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 27,
+        backdropFilter: 'blur(12px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+        background: dark ? 'rgba(120,120,128,0.14)' : 'rgba(255,255,255,0.25)',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 27,
+        boxShadow: dark
+          ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15)'
+          : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+        border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* autocorrect bar */}
+      <div style={{
+        display: 'flex', gap: 20, alignItems: 'center',
+        padding: '8px 22px 13px', width: '100%', boxSizing: 'border-box',
+        position: 'relative',
+      }}>
+        {['"The"', 'the', 'to'].map((w, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <div style={{ width: 1, height: 25, background: '#ccc', opacity: 0.3 }} />}
+            <div style={{
+              flex: 1, textAlign: 'center',
+              fontFamily: '-apple-system, system-ui', fontSize: 17,
+              color: sugg, letterSpacing: -0.43, lineHeight: '22px',
+            }}>{w}</div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* key layout */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 13,
+        padding: '0 6.5px', width: '100%', boxSizing: 'border-box',
+        position: 'relative',
+      }}>
+        {row(['q','w','e','r','t','y','u','i','o','p'])}
+        {row(['a','s','d','f','g','h','j','k','l'], 20)}
+        <div style={{ display: 'flex', gap: 14.25, alignItems: 'center' }}>
+          {key(icons.shift, { w: 45, k: 'shift' })}
+          <div style={{ display: 'flex', gap: 6.5, flex: 1 }}>
+            {['z','x','c','v','b','n','m'].map(l => key(l, { flex: true, k: l }))}
+          </div>
+          {key(icons.del, { w: 45, k: 'del' })}
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {key('ABC', { w: 92.25, fs: 18, k: 'abc' })}
+          {key('', { flex: true, k: 'space' })}
+          {key(icons.ret, { w: 92.25, ret: true, k: 'ret' })}
+        </div>
+      </div>
+
+      {/* bottom spacer (emoji+mic area, icons omitted) */}
+      <div style={{ height: 56, width: '100%', position: 'relative' }} />
+    </div>
+  );
+}
+
+Object.assign(window, {
+  IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard,
+});
+
+</script>
+
+<!-- ===== tokens.jsx ===== -->
+<script type="text/babel">
+// FantasyHub audit — shared design tokens + primitives.
+// Keep the current dark charcoal/cream/old-gold system but tighten the scale.
+
+const FH = {
+  // Core bg
+  bg:        '#141312',   // slightly warmer than #1A1A1A, less blue
+  bgElev1:   '#1C1A17',   // cards
+  bgElev2:   '#24211D',   // cards on cards
+  hairline:  'rgba(232,226,214,0.08)',
+  hairlineStrong: 'rgba(232,226,214,0.14)',
+
+  // Text
+  cream:     '#E8E2D6',
+  creamDim:  'rgba(232,226,214,0.62)',
+  creamFaint:'rgba(232,226,214,0.38)',
+
+  // Gold hierarchy — stop using gold for everything.
+  gold:      '#C9A96E',   // primary accent only (CTAs, active tab, key numbers)
+  goldDim:   'rgba(201,169,110,0.55)',
+  goldFaint: 'rgba(201,169,110,0.14)',
+
+  // Semantic
+  win:       '#6FBF8A',   // softer than iOS green
+  loss:      '#D96B6B',
+  tie:       '#D6B461',
+  info:      '#7FA8C9',
+
+  // Chart
+  chartLine: '#C9A96E',
+  chartGrid: 'rgba(232,226,214,0.06)',
+
+  // Type
+  display:   "'Fraktion Mono', ui-monospace, 'SF Mono', Menlo, monospace", // numbers
+  sans:      "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+  heading:   "-apple-system, 'SF Pro Display', system-ui, sans-serif",
+};
+
+// ─── Text helpers ───
+const T = {
+  // Display numerals — tabular, tight, confident.
+  num: (size = 32, weight = 600) => ({
+    fontFamily: FH.display,
+    fontSize: size, fontWeight: weight,
+    fontVariantNumeric: 'tabular-nums',
+    letterSpacing: -0.5, lineHeight: 1,
+    color: FH.cream,
+  }),
+  // Section eyebrow — tighter than current 13px spaced caps.
+  eyebrow: (color = FH.gold) => ({
+    fontFamily: FH.sans, fontSize: 11, fontWeight: 600,
+    letterSpacing: 1.2, textTransform: 'uppercase', color,
+  }),
+  label: (color = FH.creamDim, size = 12) => ({
+    fontFamily: FH.sans, fontSize: size, fontWeight: 500, color,
+    letterSpacing: 0.1,
+  }),
+  body: (color = FH.cream, size = 15) => ({
+    fontFamily: FH.sans, fontSize: size, fontWeight: 500, color,
+    letterSpacing: -0.1,
+  }),
+  h1: () => ({
+    fontFamily: FH.heading, fontSize: 22, fontWeight: 700,
+    color: FH.cream, letterSpacing: -0.3, lineHeight: 1.15,
+  }),
+};
+
+// ─── Phone shell ─ a lightweight replacement for IOSDevice when we want
+// full control over nav/tab bar chrome and a real tab bar with icons.
+function PhoneShell({ children, navTitle, navLeft, navRight, activeTab, showTabBar = true, noNav = false }) {
+  return (
+    <div style={{
+      width: 390, height: 844, borderRadius: 48, overflow: 'hidden',
+      position: 'relative', background: FH.bg,
+      boxShadow: '0 40px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.4)',
+      fontFamily: FH.sans, color: FH.cream,
+      WebkitFontSmoothing: 'antialiased',
+    }}>
+      {/* dynamic island */}
+      <div style={{
+        position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+        width: 126, height: 37, borderRadius: 24, background: '#000', zIndex: 50,
+      }} />
+      {/* status bar */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 32px 0', height: 54,
+      }}>
+        <div style={{ fontFamily: FH.sans, fontSize: 17, fontWeight: 600, color: FH.cream, letterSpacing: -0.4 }}>9:41</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: FH.cream }}>
+          <svg width="18" height="11" viewBox="0 0 18 11"><path d="M1 8h2v2H1zM5 6h2v4H5zM9 3h2v7H9zM13 0h2v10h-2z" fill="currentColor"/></svg>
+          <svg width="16" height="11" viewBox="0 0 16 11"><path d="M8 10.5c.7 0 1.3-.6 1.3-1.3S8.7 7.9 8 7.9s-1.3.6-1.3 1.3S7.3 10.5 8 10.5zM3.8 6.5c1.2-1.2 2.7-1.8 4.2-1.8s3 .6 4.2 1.8l1.2-1.2C11.9 3.9 10 3.1 8 3.1S4.1 3.9 2.6 5.3l1.2 1.2z" fill="currentColor"/></svg>
+          <svg width="26" height="11" viewBox="0 0 26 11"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="currentColor" strokeOpacity=".4" fill="none"/><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"/><rect x="22.5" y="3.5" width="2" height="4" rx="1" fill="currentColor" fillOpacity=".4"/></svg>
+        </div>
+      </div>
+
+      {/* nav bar */}
+      {!noNav && (
+        <div style={{
+          position: 'absolute', top: 54, left: 0, right: 0, zIndex: 5,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 16px', height: 44,
+        }}>
+          <div style={{ width: 44, display: 'flex', alignItems: 'center' }}>{navLeft}</div>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: 600, color: FH.cream, letterSpacing: -0.4 }}>
+            {navTitle}
+          </div>
+          <div style={{ width: 44, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>{navRight}</div>
+        </div>
+      )}
+
+      {/* body */}
+      <div style={{
+        position: 'absolute', top: noNav ? 54 : 98, bottom: showTabBar ? 92 : 0, left: 0, right: 0,
+        overflow: 'hidden',
+      }}>
+        {children}
+      </div>
+
+      {/* tab bar */}
+      {showTabBar && <TabBar active={activeTab} />}
+
+      {/* home indicator */}
+      <div style={{
+        position: 'absolute', bottom: 8, left: 0, right: 0, zIndex: 60,
+        display: 'flex', justifyContent: 'center', pointerEvents: 'none',
+      }}>
+        <div style={{ width: 139, height: 5, borderRadius: 100, background: 'rgba(232,226,214,0.5)' }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab bar ─ 5 items, mirrors current app.
+function TabBar({ active = 'Dashboard' }) {
+  const items = [
+    { k: 'Dashboard', icon: <IconDashboard/> },
+    { k: 'Analytics', icon: <IconBars/> },
+    { k: 'Intel',     icon: <IconSignal/> },
+    { k: 'AI Chat',   icon: <IconChat/> },
+    { k: 'Profile',   icon: <IconProfile/> },
+  ];
+  return (
+    <div style={{
+      position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 55,
+      height: 92, paddingBottom: 22,
+      background: 'linear-gradient(to top, rgba(20,19,18,0.98) 60%, rgba(20,19,18,0))',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+      padding: '8px 12px 22px',
+    }}>
+      {items.map(it => {
+        const on = it.k === active;
+        return (
+          <div key={it.k} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            color: on ? FH.gold : FH.creamFaint,
+            flex: 1,
+          }}>
+            <div style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.icon}</div>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.2 }}>{it.k}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Icons (stroke, inherit color) ───
+const S = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round' };
+const IconDashboard = () => <svg width="22" height="22" viewBox="0 0 22 22" {...S}><rect x="3" y="3" width="7" height="10" rx="1.5"/><rect x="12" y="3" width="7" height="6" rx="1.5"/><rect x="12" y="11" width="7" height="8" rx="1.5"/><rect x="3" y="15" width="7" height="4" rx="1.5"/></svg>;
+const IconBars = () => <svg width="22" height="22" viewBox="0 0 22 22" {...S}><path d="M4 18V8M11 18V4M18 18v-6"/></svg>;
+const IconSignal = () => <svg width="22" height="22" viewBox="0 0 22 22" {...S}><path d="M6 6c-1.5 1.5-2 3-2 5s.5 3.5 2 5M16 6c1.5 1.5 2 3 2 5s-.5 3.5-2 5M8.5 8.5c-.8.8-1 1.6-1 2.5s.2 1.7 1 2.5M13.5 8.5c.8.8 1 1.6 1 2.5s-.2 1.7-1 2.5"/><circle cx="11" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>;
+const IconChat = () => <svg width="22" height="22" viewBox="0 0 22 22" {...S}><path d="M4 6a2 2 0 012-2h7a2 2 0 012 2v5a2 2 0 01-2 2H9l-3 3v-3H6a2 2 0 01-2-2V6z"/><path d="M11 13.5V15a2 2 0 002 2h3l2 2v-2a2 2 0 002-2v-4a2 2 0 00-2-2h-1"/></svg>;
+const IconProfile = () => <svg width="22" height="22" viewBox="0 0 22 22" {...S}><circle cx="11" cy="8" r="3.5"/><path d="M4 19c1.2-3.5 4-5 7-5s5.8 1.5 7 5"/></svg>;
+
+// Utility cards
+function Card({ children, style = {}, pad = 16, elev = 1 }) {
+  return (
+    <div style={{
+      background: elev === 2 ? FH.bgElev2 : FH.bgElev1,
+      borderRadius: 16, padding: pad,
+      border: `0.5px solid ${FH.hairline}`,
+      ...style,
+    }}>{children}</div>
+  );
+}
+
+function Eyebrow({ children, color = FH.gold, icon, style = {} }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...T.eyebrow(color), ...style }}>
+      {icon && <span style={{ display: 'flex' }}>{icon}</span>}
+      {children}
+    </div>
+  );
+}
+
+// Pin — numbered critique marker
+function Pin({ n, x, y, color = '#D96B6B' }) {
+  return (
+    <div style={{
+      position: 'absolute', left: x, top: y, zIndex: 4,
+      width: 22, height: 22, borderRadius: 11,
+      background: color, color: '#1A1A1A',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: FH.sans, fontSize: 11, fontWeight: 800,
+      boxShadow: `0 0 0 3px rgba(217,107,107,0.25), 0 2px 8px rgba(0,0,0,0.4)`,
+    }}>{n}</div>
+  );
+}
+
+// Small sparkline
+function Sparkline({ data, w = 80, h = 22, color = FH.gold, fill = true }) {
+  const max = Math.max(...data), min = Math.min(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * (h - 2) - 1;
+    return [x, y];
+  });
+  const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+  const fillD = `${d} L${w} ${h} L0 ${h} Z`;
+  return (
+    <svg width={w} height={h} style={{ display: 'block' }}>
+      {fill && <path d={fillD} fill={color} fillOpacity={0.12}/>}
+      <path d={d} fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+// Avatar w/ initial
+function Avatar({ initial, size = 28, color = FH.gold, bg }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size / 2,
+      background: bg || `rgba(201,169,110,0.18)`,
+      color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: FH.sans, fontWeight: 700, fontSize: size * 0.42,
+      letterSpacing: 0, flexShrink: 0,
+    }}>{initial}</div>
+  );
+}
+
+Object.assign(window, { FH, T, PhoneShell, TabBar, Card, Eyebrow, Pin, Sparkline, Avatar,
+  IconDashboard, IconBars, IconSignal, IconChat, IconProfile });
+
+</script>
+
+<!-- ===== before.jsx ===== -->
+<script type="text/babel">
+// "Before" screen recreations — minimal fidelity to the current app so we
+// can pin critiques on them. Kept deliberately simple.
+
+// Current dashboard (BIG12)
+function BeforeDashboard() {
+  return (
+    <PhoneShell navTitle={<span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>BIG12 <svg width="10" height="6" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg></span>} activeTab="Dashboard">
+      <div style={{ padding: '8px 16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* league chip card */}
+        <Card pad={16}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: -0.3 }}>BIG12</div>
+            <div style={{ fontSize: 10, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: FH.goldFaint, color: FH.gold }}>Sleeper</div>
+          </div>
+          <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
+            <div><div style={{ fontSize: 18, fontWeight: 700 }}>12</div><div style={{ fontSize: 10, color: FH.creamDim }}>Teams</div></div>
+            <div><div style={{ fontSize: 18, fontWeight: 700 }}>4</div><div style={{ fontSize: 10, color: FH.creamDim }}>Seasons</div></div>
+            <div><div style={{ fontSize: 18, fontWeight: 700 }}>HALF_PPR</div><div style={{ fontSize: 10, color: FH.creamDim }}>Scoring</div></div>
+          </div>
+        </Card>
+
+        {/* streak card with left gold border */}
+        <Card pad={14} style={{ borderLeft: `3px solid ${FH.gold}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <Eyebrow icon={<svg width="11" height="11" viewBox="0 0 11 11" fill={FH.gold}><path d="M5.5 1C3 3 2 5 2 7a3.5 3.5 0 107 0c0-1-1-2-1-3 0 2-1 2-1 2s0-2-1.5-5z"/></svg>}>STREAK</Eyebrow>
+              <div style={{ marginTop: 6, fontSize: 14, color: FH.cream, lineHeight: 1.35 }}>You've won <span style={{ color: FH.gold, fontWeight: 700 }}>6 straight</span><br/>against kozmania</div>
+              <div style={{ marginTop: 4, fontSize: 11, color: FH.creamDim }}>Active winning streak</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ ...T.num(22), color: FH.gold }}>6–0</div>
+              <div style={{ fontSize: 10, color: FH.creamDim, marginTop: 2 }}>Last 6</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 12 }}>
+            {[0,1,2,3,4,5,6,7].map(i => <div key={i} style={{ width: 5, height: 5, borderRadius: 3, background: i === 0 ? FH.gold : FH.creamFaint }}/>)}
+          </div>
+        </Card>
+
+        {/* record block */}
+        <Card pad={16}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ ...T.num(24) }}>30–26–0</div>
+              <div style={{ fontSize: 10, color: FH.creamDim, marginTop: 2 }}>All-Time Record</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ ...T.num(22), color: FH.creamFaint }}>54%</div>
+              <div style={{ fontSize: 10, color: FH.creamFaint, marginTop: 2 }}>Win Rate</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 20, marginTop: 14 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ color: FH.gold, fontSize: 14 }}>🏆🏆</span>
+              <div><div style={{ ...T.num(15) }}>2</div><div style={{ fontSize: 10, color: FH.creamDim }}>Championships</div></div>
+            </div>
+            <div><div style={{ ...T.num(15) }}>4</div><div style={{ fontSize: 10, color: FH.creamDim }}>Playoff Apps</div></div>
+          </div>
+          <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
+            <div><div style={{ ...T.num(22), color: FH.win }}>103.0</div><div style={{ fontSize: 10, color: FH.creamDim }}>Your PPG</div></div>
+            <div><div style={{ ...T.num(18), color: FH.creamFaint }}>95.1</div><div style={{ fontSize: 10, color: FH.creamFaint }}>League Avg</div></div>
+            <div><div style={{ ...T.num(18), color: FH.win }}>+7.8</div><div style={{ fontSize: 10, color: FH.creamDim }}>vs Avg</div></div>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Sparkline data={[80,92,101,88,95,110,102,86,98,112,104,90,99,108,103,89,96,111,102,107]} w={322} h={34} color={FH.loss} fill/>
+            <div style={{ textAlign: 'center', fontSize: 10, color: FH.creamFaint, marginTop: -14 }}>Last 20 weeks</div>
+          </div>
+        </Card>
+
+        <Eyebrow>YOUR LEGACY</Eyebrow>
+        <div style={{ display: 'flex', gap: 10, overflow: 'hidden' }}>
+          {['BOOM OR BUST', 'PLAYOFF MACHINE', 'DYNASTY'].map((t, i) => (
+            <Card key={t} pad={12} style={{ minWidth: 130 }}>
+              <div style={{ fontSize: 10, color: FH.gold, fontWeight: 700, letterSpacing: 0.8 }}>{t}</div>
+              <div style={{ ...T.num(18), marginTop: 6, color: FH.creamFaint }}>σ = 24.8</div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </PhoneShell>
+  );
+}
+
+// Current analytics (All-Time)
+function BeforeAnalytics() {
+  const kpis = [
+    { icon:'📅', v:'4', l:'Seasons' },
+    { icon:'🏟', v:'784', l:'Total Games' },
+    { icon:'🔥', v:'175.9', l:'All-Time High' },
+    { icon:'📊', v:'95.1', l:'Avg PPG' },
+  ];
+  const standings = [
+    ['1','JimmyTea','12–2'],['2','Alxrao','11–3'],['3','bdel4','9–5'],['4','Jahelbeatz5','8–6'],['5','klensch9','7–7']
+  ];
+  return (
+    <PhoneShell navTitle="Analytics" activeTab="Analytics">
+      <div style={{ padding: '4px 16px 20px', display:'flex', flexDirection:'column', gap: 14 }}>
+        <div style={{ display:'flex', gap: 8, overflow:'hidden' }}>
+          {['All-Time','2025','2024','2023','2022'].map((y, i) => (
+            <div key={y} style={{
+              padding: '7px 14px', borderRadius: 999,
+              background: i === 0 ? FH.gold : 'transparent',
+              color: i === 0 ? '#1A1A1A' : FH.creamDim,
+              border: i === 0 ? 'none' : `0.5px solid ${FH.hairlineStrong}`,
+              fontSize: 12, fontWeight: 700, letterSpacing: 0.2,
+            }}>{y}</div>
+          ))}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 10 }}>
+          {kpis.map(k => (
+            <Card key={k.l} pad={16} style={{ textAlign:'center' }}>
+              <div style={{ fontSize: 18, color: FH.gold, opacity: .8 }}>{k.icon}</div>
+              <div style={{ ...T.num(30), marginTop: 10 }}>{k.v}</div>
+              <div style={{ fontSize: 11, color: FH.creamDim, marginTop: 4 }}>{k.l}</div>
+            </Card>
+          ))}
+        </div>
+
+        <div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom: 8, borderBottom: `0.5px solid ${FH.gold}40` }}>
+            <Eyebrow icon={<svg width="12" height="12" viewBox="0 0 12 12" stroke={FH.gold} strokeWidth="1.6" fill="none"><path d="M2 3h8M2 6h5M2 9h7"/></svg>}>STANDINGS &amp; RANKINGS</Eyebrow>
+            <div style={{ fontSize: 11, color: FH.gold, fontWeight: 600 }}>See All</div>
+          </div>
+          <Card pad={0} style={{ marginTop: 8 }}>
+            {standings.map((r, i) => (
+              <div key={r[1]} style={{ display:'flex', alignItems:'center', padding:'12px 14px', borderBottom: i < 4 ? `0.5px solid ${FH.hairline}` : 'none' }}>
+                <div style={{ width: 20, color: FH.creamDim, fontSize: 13 }}>{r[0]}</div>
+                <div style={{ flex: 1, fontSize: 14 }}>{r[1]}</div>
+                <div style={{ ...T.num(14) }}>{r[2]}</div>
+              </div>
+            ))}
+          </Card>
+        </div>
+
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom: 8, borderBottom: `0.5px solid ${FH.gold}40` }}>
+          <Eyebrow icon={<svg width="12" height="12" viewBox="0 0 12 12" stroke={FH.gold} strokeWidth="1.6" fill="none"><path d="M2 4h7l-1.5-1.5M10 8H3l1.5 1.5"/></svg>}>HEAD-TO-HEAD</Eyebrow>
+          <div style={{ fontSize: 11, color: FH.gold, fontWeight: 600 }}>See All</div>
+        </div>
+      </div>
+    </PhoneShell>
+  );
+}
+
+// Current standings
+function BeforeStandings() {
+  const rows = [
+    ['1','T','tyler','9–5–0','1500.1','1346.4',FH.win],
+    ['2','B','Blake','8–6–0','1563.5','1441.0',FH.win],
+    ['3','E','efuego93','9–5–0','1529.3','1426.5',FH.win],
+    ['4','F','Frankie N.','9–5–0','1481.3','1331.7',FH.win],
+    ['5','M','matt','8–6–0','1469.4','1550.5',FH.win],
+    ['6','J','jake','7–7–0','1508.9','1574.7',FH.creamDim],
+    ['7','B','Bryan Yat.','6–8–0','1586.9','1496.5',FH.loss],
+    ['8','R','Ryan Curr.','6–8–0','1447.7','1618.0',FH.loss],
+    ['9','P','Peter','5–9–0','1354.3','1502.9',FH.loss],
+    ['10','A','AB','6–8–0','1348.0','1413.0',FH.loss],
+    ['11','R','Ryan','2–12–0','1243.7','1518.9',FH.loss],
+  ];
+  return (
+    <PhoneShell navTitle="Standings" activeTab="Analytics" navLeft={
+      <div style={{ width: 32, height: 32, borderRadius: 16, background: FH.bgElev1, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <svg width="12" height="12" viewBox="0 0 12 12" stroke={FH.cream} strokeWidth="1.8" fill="none" strokeLinecap="round"><path d="M8 2L3 6l5 4"/></svg>
+      </div>
+    }>
+      <div style={{ padding: '8px 16px 0' }}>
+        <div style={{ display:'flex', background: FH.bgElev1, borderRadius: 10, padding: 3, gap: 3 }}>
+          <div style={{ flex:1, textAlign:'center', padding:'9px 10px', borderRadius: 8, background:'#fff', color:'#1A1A1A', fontSize: 13, fontWeight: 600 }}>Standings</div>
+          <div style={{ flex:1, textAlign:'center', padding:'9px 10px', fontSize: 13, color: FH.creamDim, fontWeight: 600 }}>Power Rankings</div>
+        </div>
+        <div style={{ display:'flex', padding:'18px 4px 8px', fontSize: 10, color: FH.creamFaint, fontWeight: 600, letterSpacing: 1 }}>
+          <div style={{ width: 20 }}>#</div>
+          <div style={{ flex: 1, paddingLeft: 30 }}>MANAGER</div>
+          <div style={{ width: 56 }}>W-L-T</div>
+          <div style={{ width: 46, textAlign:'right' }}>PF</div>
+          <div style={{ width: 46, textAlign:'right' }}>PA</div>
+        </div>
+        {rows.map((r, i) => (
+          <div key={r[2]} style={{
+            display:'flex', alignItems:'center', padding:'10px 4px',
+            borderBottom: `0.5px solid ${FH.hairline}`,
+            position:'relative',
+          }}>
+            {i === 4 && <div style={{ position:'absolute', bottom: -1, right: 0, fontSize: 8, color: FH.gold, fontWeight: 700, letterSpacing: 1 }}>PLAYOFF LINE</div>}
+            <div style={{ width: 20, color: FH.creamDim, fontSize: 13 }}>{r[0]}</div>
+            <Avatar initial={r[1]} size={26}/>
+            <div style={{ flex:1, paddingLeft: 8, fontSize: 14 }}>{r[2]}</div>
+            <div style={{ width: 56, fontSize: 13, color: r[6], fontWeight: 600 }}>{r[3]}</div>
+            <div style={{ width: 46, fontSize: 13, color: FH.cream, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r[4]}</div>
+            <div style={{ width: 46, fontSize: 13, color: FH.creamDim, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r[5]}</div>
+          </div>
+        ))}
+      </div>
+    </PhoneShell>
+  );
+}
+
+// Current intel (across the league - empty state)
+function BeforeIntel() {
+  return (
+    <PhoneShell navTitle={<span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>BIG12 <svg width="10" height="6" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg></span>}
+      activeTab="Intel" navRight={
+        <div style={{ width: 32, height: 32, borderRadius: 16, border: `0.5px solid ${FH.hairlineStrong}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" stroke={FH.cream} strokeWidth="1.6" fill="none" strokeLinecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3 3"/></svg>
+        </div>
+      }>
+      <div style={{ padding: '8px 16px 20px' }}>
+        <div style={{ display:'flex', background: FH.bgElev1, borderRadius: 10, padding: 3, gap: 3 }}>
+          <div style={{ flex:1, textAlign:'center', padding:'9px 10px', fontSize: 11, color: FH.creamDim, letterSpacing: 1.5, fontWeight: 700 }}>MY TEAM</div>
+          <div style={{ flex:1, textAlign:'center', padding:'9px 10px', borderRadius: 8, background: FH.gold, color:'#1A1A1A', fontSize: 11, letterSpacing: 1.5, fontWeight: 700 }}>ACROSS THE LEAGUE</div>
+        </div>
+        <div style={{ display:'flex', gap: 8, marginTop: 14, overflow:'hidden' }}>
+          {[{l:'My Team',on:true},{l:'QB',on:true},{l:'RB'},{l:'WR'},{l:'TE'},{l:'K'},{l:'Rankin'}].map(f => (
+            <div key={f.l} style={{
+              padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+              background: f.on ? FH.goldFaint : 'transparent',
+              color: f.on ? FH.gold : FH.creamDim,
+              border: f.on ? 'none' : `0.5px solid ${FH.hairlineStrong}`,
+            }}>{f.l}</div>
+          ))}
+        </div>
+        <Card pad={16} style={{ marginTop: 14, display:'flex', alignItems:'center', gap: 10 }}>
+          <svg width="16" height="16" viewBox="0 0 16 16" stroke={FH.creamDim} strokeWidth="1.5" fill="none" strokeLinecap="round"><path d="M5 5c-1 1-1.5 2-1.5 3s.5 2 1.5 3M11 5c1 1 1.5 2 1.5 3s-.5 2-1.5 3"/><circle cx="8" cy="8" r="1" fill={FH.creamDim}/></svg>
+          <div style={{ fontSize: 13, color: FH.creamDim }}>No signals match your filters</div>
+        </Card>
+        <div style={{ height: 380 }}/>
+      </div>
+    </PhoneShell>
+  );
+}
+
+Object.assign(window, { BeforeDashboard, BeforeAnalytics, BeforeStandings, BeforeIntel });
+
+</script>
+
+<!-- ===== after.jsx ===== -->
+<script type="text/babel">
+// "After" — redesigned screens.
+
+// ─── Helper: gold divider that doesn't run the whole width
+const GoldRule = () => <div style={{ width: 28, height: 2, background: FH.gold, borderRadius: 1 }}/>;
+
+// ────────────────────────────────────────────────
+// AFTER · Dashboard — "Week at a glance"
+// Fix: lead with the ONE thing that matters this week. Demote import logs.
+// ────────────────────────────────────────────────
+function AfterDashboard() {
+  return (
+    <PhoneShell
+      navTitle={<span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+        <span style={{ color: FH.creamDim, fontSize: 11, fontWeight: 600, letterSpacing: 1 }}>LEAGUE</span>
+        <span style={{ fontSize: 16, fontWeight: 700 }}>BIG12</span>
+        <svg width="9" height="6" viewBox="0 0 9 6"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+      </span>}
+      activeTab="Dashboard">
+
+      <div style={{ padding: '0 16px 20px', overflow:'auto', height:'100%', display:'flex', flexDirection:'column', gap: 14 }}>
+
+        {/* Hero: Week 14, your matchup — THE moment, not a tile */}
+        <div style={{ padding: '18px 4px 4px' }}>
+          <div style={{ fontSize: 10, color: FH.gold, fontWeight: 700, letterSpacing: 1.4 }}>WEEK 14 · SUN 1:00 PM</div>
+          <div style={{ display:'flex', alignItems:'baseline', gap: 8, marginTop: 8 }}>
+            <span style={{ ...T.h1(), fontSize: 26 }}>You vs kozmania</span>
+          </div>
+          <div style={{ marginTop: 6, fontSize: 13, color: FH.creamDim, lineHeight: 1.4 }}>
+            A loss ends your <span style={{ color: FH.gold, fontWeight: 600 }}>6-game</span> win streak and costs you the #2 seed.
+          </div>
+        </div>
+
+        {/* Matchup card */}
+        <Card pad={0} style={{ overflow:'hidden' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 44px 1fr', alignItems:'center', padding: '18px 20px' }}>
+            <div>
+              <div style={{ fontSize: 10, color: FH.gold, fontWeight: 700, letterSpacing: 1 }}>YOU</div>
+              <div style={{ ...T.num(28), marginTop: 6 }}>114.2</div>
+              <div style={{ fontSize: 11, color: FH.creamDim, marginTop: 2 }}>proj · 78% win</div>
+            </div>
+            <div style={{ textAlign:'center', fontSize: 11, color: FH.creamFaint, fontWeight: 700, letterSpacing: 1.5 }}>VS</div>
+            <div style={{ textAlign:'right' }}>
+              <div style={{ fontSize: 10, color: FH.creamDim, fontWeight: 700, letterSpacing: 1 }}>KOZMANIA</div>
+              <div style={{ ...T.num(28), color: FH.creamDim, marginTop: 6 }}>98.6</div>
+              <div style={{ fontSize: 11, color: FH.creamFaint, marginTop: 2 }}>proj</div>
+            </div>
+          </div>
+          {/* win prob bar */}
+          <div style={{ height: 3, display:'flex' }}>
+            <div style={{ flex: 78, background: FH.gold }}/>
+            <div style={{ flex: 22, background: FH.hairlineStrong }}/>
+          </div>
+          <div style={{ padding: '12px 20px', display:'flex', gap: 16, fontSize: 11, color: FH.creamDim }}>
+            <span>H2H <span style={{ color: FH.cream, fontWeight: 600 }}>6–0</span></span>
+            <span>Avg margin <span style={{ color: FH.win, fontWeight: 600 }}>+18.4</span></span>
+            <span style={{ marginLeft:'auto', color: FH.gold, fontWeight: 600 }}>Preview →</span>
+          </div>
+        </Card>
+
+        {/* Three-across: things that need your attention THIS week */}
+        <div>
+          <Eyebrow style={{ marginBottom: 8 }}>NEEDS YOUR ATTENTION</Eyebrow>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap: 8 }}>
+            {[
+              { n:'2',  l:'Lineup gaps', sub:'FLEX · D/ST', color: FH.loss },
+              { n:'4',  l:'Waiver adds', sub:'trending up',  color: FH.win  },
+              { n:'1',  l:'Trade offer', sub:'from @jake',   color: FH.gold },
+            ].map(c => (
+              <Card key={c.l} pad={12}>
+                <div style={{ ...T.num(26), color: c.color }}>{c.n}</div>
+                <div style={{ fontSize: 11, color: FH.cream, marginTop: 6, fontWeight: 600 }}>{c.l}</div>
+                <div style={{ fontSize: 10, color: FH.creamFaint, marginTop: 1 }}>{c.sub}</div>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* All-time strip — single row, scannable, tabular */}
+        <Card pad={14}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <Eyebrow>ALL-TIME · 4 SEASONS</Eyebrow>
+            <span style={{ fontSize: 11, color: FH.gold, fontWeight: 600 }}>Full stats →</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop: 12 }}>
+            <div>
+              <div style={{ ...T.num(28) }}>30–26</div>
+              <div style={{ fontSize: 10, color: FH.creamDim, marginTop: 3 }}>Record · 54%</div>
+            </div>
+            <div>
+              <div style={{ ...T.num(22), color: FH.win }}>103.0</div>
+              <div style={{ fontSize: 10, color: FH.creamDim, marginTop: 3 }}>PPG · <span style={{ color: FH.win }}>+7.8</span> vs avg</div>
+            </div>
+            <div style={{ textAlign:'right' }}>
+              <div style={{ display:'flex', gap: 5, justifyContent:'flex-end', alignItems:'center' }}>
+                <span style={{ ...T.num(22), color: FH.gold }}>2</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill={FH.gold}><path d="M4 2h8v3a4 4 0 01-4 4 4 4 0 01-4-4V2zM2 3h2v2H2zM12 3h2v2h-2zM6 10h4v3H6z"/></svg>
+              </div>
+              <div style={{ fontSize: 10, color: FH.creamDim, marginTop: 3 }}>Titles · 4 POs</div>
+            </div>
+          </div>
+          {/* weekly PPG chart, clean */}
+          <div style={{ marginTop: 14, position: 'relative' }}>
+            <Sparkline data={[80,92,101,88,95,110,102,86,98,112,104,90,99,108,103,89,96,111,102,107]} w={322} h={42} color={FH.gold} fill/>
+            <div style={{ position:'absolute', left: 0, bottom: -2, fontSize: 9, color: FH.creamFaint, letterSpacing: 0.5 }}>W1</div>
+            <div style={{ position:'absolute', right: 0, bottom: -2, fontSize: 9, color: FH.creamFaint, letterSpacing: 0.5 }}>W20</div>
+          </div>
+        </Card>
+
+        {/* League pulse — replace activity log with something actually useful */}
+        <div>
+          <Eyebrow style={{ marginBottom: 8 }}>LEAGUE PULSE · THIS WEEK</Eyebrow>
+          <Card pad={0}>
+            {[
+              { who:'Blake', what:'just set his lineup',              when:'2h ago', c: FH.info },
+              { who:'efuego93', what:'accepted a trade — gave up R. Jones', when:'5h ago', c: FH.gold },
+              { who:'JimmyTea', what:'claimed B. Aubrey off waivers',  when:'1d ago', c: FH.win  },
+              { who:'jake', what:'dropped S. Diggs · hasn\'t logged in 6d', when:'2d ago', c: FH.loss },
+            ].map((r, i, a) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', padding:'12px 14px', borderBottom: i < a.length - 1 ? `0.5px solid ${FH.hairline}` : 'none' }}>
+                <div style={{ width: 6, height: 6, borderRadius: 3, background: r.c, marginRight: 10 }}/>
+                <div style={{ flex: 1, fontSize: 13, color: FH.cream, lineHeight: 1.35 }}>
+                  <span style={{ fontWeight: 700 }}>{r.who}</span>
+                  <span style={{ color: FH.creamDim }}> {r.what}</span>
+                </div>
+                <div style={{ fontSize: 10, color: FH.creamFaint }}>{r.when}</div>
+              </div>
+            ))}
+          </Card>
+        </div>
+      </div>
+    </PhoneShell>
+  );
+}
+
+// ────────────────────────────────────────────────
+// AFTER · Analytics — Lead with insight, not KPI tiles
+// ────────────────────────────────────────────────
+function AfterAnalytics() {
+  return (
+    <PhoneShell navTitle="Analytics" activeTab="Analytics" navRight={
+      <div style={{ fontSize: 13, color: FH.gold, fontWeight: 600 }}>BIG12 ↓</div>
+    }>
+      <div style={{ padding: '0 16px 20px', overflow:'auto', height:'100%', display:'flex', flexDirection:'column', gap: 14 }}>
+        {/* segmented range */}
+        <div style={{ display:'flex', background: FH.bgElev1, borderRadius: 10, padding: 3, gap: 2, marginTop: 4 }}>
+          {['All-time','2025','2024','2023','2022'].map((y, i) => (
+            <div key={y} style={{
+              flex: 1, textAlign:'center', padding:'8px 6px',
+              borderRadius: 7, fontSize: 11, fontWeight: 600, letterSpacing: 0.2,
+              background: i === 0 ? FH.bgElev2 : 'transparent',
+              color: i === 0 ? FH.cream : FH.creamDim,
+              border: i === 0 ? `0.5px solid ${FH.hairlineStrong}` : 'none',
+            }}>{y}</div>
+          ))}
+        </div>
+
+        {/* Headline insight */}
+        <Card pad={16} style={{ background: `linear-gradient(180deg, ${FH.bgElev1} 0%, ${FH.bgElev1} 70%, rgba(201,169,110,0.06) 100%)` }}>
+          <Eyebrow>INSIGHT · UPDATED 2H AGO</Eyebrow>
+          <div style={{ marginTop: 10, fontSize: 17, color: FH.cream, fontWeight: 600, lineHeight: 1.3, letterSpacing: -0.3 }}>
+            Your team overperforms in <span style={{ color: FH.gold }}>weeks 10–14</span>, averaging <span style={{ color: FH.win }}>+12.4</span> over season pace.
+          </div>
+          <div style={{ marginTop: 12 }}>
+            {/* season-shape line */}
+            <svg width="100%" height="70" viewBox="0 0 322 70" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="aa" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stopColor={FH.gold} stopOpacity="0.3"/>
+                  <stop offset="1" stopColor={FH.gold} stopOpacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0 40 L18 42 L36 38 L54 44 L72 41 L90 35 L108 38 L126 34 L144 36 L162 28 L180 22 L198 18 L216 14 L234 20 L252 16 L270 10 L288 16 L306 12 L322 18 L322 70 L0 70Z" fill="url(#aa)"/>
+              <path d="M0 40 L18 42 L36 38 L54 44 L72 41 L90 35 L108 38 L126 34 L144 36 L162 28 L180 22 L198 18 L216 14 L234 20 L252 16 L270 10 L288 16 L306 12 L322 18" fill="none" stroke={FH.gold} strokeWidth="1.8"/>
+              <line x1="180" y1="0" x2="180" y2="70" stroke={FH.creamFaint} strokeDasharray="2 3" strokeWidth="0.5"/>
+              <text x="185" y="12" fontSize="9" fill={FH.creamDim} fontFamily={FH.sans}>W10</text>
+            </svg>
+          </div>
+        </Card>
+
+        {/* KPI mini-strip (one row, less noisy) */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 8 }}>
+          {[['4','Seasons'],['784','Games'],['175.9','Season hi'],['95.1','Avg PPG']].map(([v, l]) => (
+            <div key={l} style={{ textAlign:'center', padding: 10, borderRadius: 12, background: FH.bgElev1, border: `0.5px solid ${FH.hairline}` }}>
+              <div style={{ ...T.num(17) }}>{v}</div>
+              <div style={{ fontSize: 9, color: FH.creamDim, marginTop: 4, letterSpacing: 0.3 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Section directory — one card per analytic */}
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap: 10, marginBottom: 10 }}>
+            <GoldRule/>
+            <Eyebrow>DRILL DOWN</Eyebrow>
+          </div>
+          {[
+            { k:'Standings & power',    stat:'JimmyTea 12–2', arrow:'#1 ↑1', spark:[7,8,9,10,11,12,12], color: FH.win },
+            { k:'Head-to-head',         stat:'You vs Blake',  arrow:'6-3',   spark:[1,0,1,1,0,1,1],     color: FH.gold },
+            { k:'Draft efficiency',     stat:'+34 pts above ADP', arrow:'Top 3', spark:[3,5,4,7,9,8,10], color: FH.win },
+            { k:'Bench scoring',        stat:'62 pts left on bench', arrow:'Wk 11', spark:[3,6,4,9,12,5,8], color: FH.loss },
+            { k:'Position performance', stat:'RB group +18%',  arrow:'best',  spark:[2,3,5,4,6,7,8],     color: FH.gold },
+            { k:'Playoff success',      stat:'2 titles · 4 apps', arrow:'50%', spark:[1,0,1,0,1,1,1],    color: FH.gold },
+          ].map((r, i, a) => (
+            <div key={r.k} style={{
+              display:'flex', alignItems:'center', gap: 12,
+              padding: '14px 2px', borderBottom: i < a.length - 1 ? `0.5px solid ${FH.hairline}` : 'none',
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, color: FH.cream, fontWeight: 600 }}>{r.k}</div>
+                <div style={{ fontSize: 11, color: FH.creamDim, marginTop: 2 }}>{r.stat}</div>
+              </div>
+              <Sparkline data={r.spark} w={60} h={20} color={r.color} fill={false}/>
+              <div style={{ fontSize: 11, color: FH.creamDim, fontVariantNumeric: 'tabular-nums', minWidth: 48, textAlign:'right' }}>{r.arrow}</div>
+              <svg width="6" height="10" viewBox="0 0 6 10" stroke={FH.creamFaint} strokeWidth="1.5" fill="none" strokeLinecap="round"><path d="M1 1l4 4-4 4"/></svg>
+            </div>
+          ))}
+        </div>
+      </div>
+    </PhoneShell>
+  );
+}
+
+// ────────────────────────────────────────────────
+// AFTER · Standings — Denser, more signal per row
+// ────────────────────────────────────────────────
+function AfterStandings() {
+  const rows = [
+    { r:1, i:'T', n:'tyler',      w:'9–5', pf:1500.1, pa:1346.4, diff:'+153.7', streak:'WWWLW', form:[108,94,112,101,118] },
+    { r:2, i:'B', n:'Blake',      w:'8–6', pf:1563.5, pa:1441.0, diff:'+122.5', streak:'WLWWL', form:[98,110,106,115,88] },
+    { r:3, i:'E', n:'efuego93',   w:'9–5', pf:1529.3, pa:1426.5, diff:'+102.8', streak:'LWWWW', form:[92,104,117,112,108] },
+    { r:4, i:'F', n:'Frankie N.', w:'9–5', pf:1481.3, pa:1331.7, diff:'+149.6', streak:'WWWWL', form:[105,109,118,113,89] },
+    { r:5, i:'M', n:'matt',       w:'8–6', pf:1469.4, pa:1550.5, diff:'−81.1',  streak:'WLWLW', form:[94,102,86,113,99] },
+    { r:6, i:'J', n:'jake',       w:'7–7', pf:1508.9, pa:1574.7, diff:'−65.8',  streak:'LLWLW', form:[88,92,98,87,112] },
+    { r:7, i:'B', n:'Bryan Y.',   w:'6–8', pf:1586.9, pa:1496.5, diff:'+90.4',  streak:'WWLLL', form:[118,114,96,88,78] },
+    { r:8, i:'R', n:'Ryan C.',    w:'6–8', pf:1447.7, pa:1618.0, diff:'−170.3', streak:'LLLWW', form:[78,84,82,96,103] },
+    { r:9, i:'P', n:'Peter',      w:'5–9', pf:1354.3, pa:1502.9, diff:'−148.6', streak:'LLWLL', form:[82,76,88,74,80] },
+    { r:10,i:'A', n:'AB',         w:'6–8', pf:1348.0, pa:1413.0, diff:'−65.0',  streak:'LWLLL', form:[76,92,78,82,74] },
+    { r:11,i:'R', n:'Ryan',       w:'2–12',pf:1243.7, pa:1518.9, diff:'−275.2', streak:'LLLLL', form:[68,74,62,70,66] },
+  ];
+  const color = (w) => parseInt(w.split('–')[0]) > 7 ? FH.win : parseInt(w.split('–')[0]) < 6 ? FH.loss : FH.creamDim;
+  return (
+    <PhoneShell navTitle="Standings" activeTab="Analytics" navLeft={
+      <div style={{ width: 32, height: 32, borderRadius: 16, background: FH.bgElev1, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <svg width="12" height="12" viewBox="0 0 12 12" stroke={FH.cream} strokeWidth="1.8" fill="none" strokeLinecap="round"><path d="M8 2L3 6l5 4"/></svg>
+      </div>
+    }>
+      <div style={{ padding: '0 12px 0' }}>
+        <div style={{ display:'flex', background: FH.bgElev1, borderRadius: 10, padding: 3, gap: 2, margin: '6px 4px 12px' }}>
+          {['Standings','Power','vs ADP','Luck'].map((t, i) => (
+            <div key={t} style={{
+              flex:1, textAlign:'center', padding:'8px 6px', borderRadius: 7,
+              fontSize: 12, fontWeight: 600,
+              background: i === 0 ? FH.bgElev2 : 'transparent',
+              color: i === 0 ? FH.cream : FH.creamDim,
+              border: i === 0 ? `0.5px solid ${FH.hairlineStrong}` : 'none',
+            }}>{t}</div>
+          ))}
+        </div>
+        <div style={{ display:'flex', padding:'0 8px 8px', fontSize: 10, color: FH.creamFaint, fontWeight: 600, letterSpacing: 0.8 }}>
+          <div style={{ width: 20 }}>#</div>
+          <div style={{ width: 34 }}/>
+          <div style={{ flex: 1 }}>MANAGER</div>
+          <div style={{ width: 44 }}>REC</div>
+          <div style={{ width: 60, textAlign:'right' }}>DIFF</div>
+          <div style={{ width: 56, textAlign:'center' }}>FORM</div>
+        </div>
+        {rows.map((row, i) => (
+          <React.Fragment key={row.n}>
+            {row.r === 7 && (
+              <div style={{ display:'flex', alignItems:'center', gap: 8, padding: '8px 8px 6px' }}>
+                <div style={{ flex: 1, height: 1, background: `repeating-linear-gradient(to right, ${FH.gold} 0 4px, transparent 4px 8px)`, opacity: 0.6 }}/>
+                <div style={{ fontSize: 9, color: FH.gold, fontWeight: 700, letterSpacing: 1.5 }}>PLAYOFF LINE</div>
+                <div style={{ flex: 1, height: 1, background: `repeating-linear-gradient(to right, ${FH.gold} 0 4px, transparent 4px 8px)`, opacity: 0.6 }}/>
+              </div>
+            )}
+            <div style={{
+              display:'flex', alignItems:'center', padding:'10px 8px', gap: 0,
+              background: row.n === 'Frankie N.' ? 'rgba(201,169,110,0.06)' : 'transparent',
+              borderLeft: row.n === 'Frankie N.' ? `2px solid ${FH.gold}` : '2px solid transparent',
+              borderBottom: `0.5px solid ${FH.hairline}`,
+            }}>
+              <div style={{ width: 20, ...T.num(13), color: row.r <= 3 ? FH.gold : FH.creamDim }}>{row.r}</div>
+              <div style={{ width: 34 }}><Avatar initial={row.i} size={26}/></div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, color: FH.cream, fontWeight: 600 }}>{row.n}</div>
+                <div style={{ fontSize: 10, color: FH.creamFaint, marginTop: 1, fontVariantNumeric:'tabular-nums', letterSpacing: 0.5 }}>
+                  PF {row.pf.toFixed(1)} · PA {row.pa.toFixed(1)}
+                </div>
+              </div>
+              <div style={{ width: 44, fontSize: 13, color: color(row.w), fontWeight: 700, fontVariantNumeric:'tabular-nums' }}>{row.w}</div>
+              <div style={{ width: 60, textAlign:'right', fontSize: 12, color: row.diff.startsWith('+') ? FH.win : FH.loss, fontVariantNumeric:'tabular-nums', fontWeight: 600 }}>{row.diff}</div>
+              <div style={{ width: 56, display:'flex', justifyContent:'center' }}>
+                <Sparkline data={row.form} w={48} h={14} color={color(row.w)} fill={false}/>
+              </div>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </PhoneShell>
+  );
+}
+
+// ────────────────────────────────────────────────
+// AFTER · Intel — filled state with real signal
+// ────────────────────────────────────────────────
+function AfterIntel() {
+  const signals = [
+    { who:'tyler', roster:'QB', name:'J. Allen', change:'−3 ranks',  src:'FantasyPros', time:'2h',  tone: FH.loss, note:'QB7 → QB10 · shoulder' },
+    { who:'Blake', roster:'RB', name:'B. Robinson', change:'+2 ranks', src:'Rotoworld',  time:'4h',  tone: FH.win,  note:'RB12 → RB10 · expanded role' },
+    { who:'jake',  roster:'WR', name:'S. Diggs',   change:'dropped',  src:'Transaction', time:'2d',  tone: FH.loss, note:'Jake dropped him — ghost manager' },
+    { who:'efuego93', roster:'TE', name:'T. Kelce', change:'TNF alert', src:'FantasyPros', time:'5h', tone: FH.tie,  note:'Expected to play limited' },
+    { who:'matt', roster:'RB', name:'K. Williams', change:'+5 ranks', src:'PFF',        time:'1d',  tone: FH.win,  note:'Moved to RB1 workload' },
+  ];
+  return (
+    <PhoneShell
+      navTitle={<span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+        <span style={{ color: FH.creamDim, fontSize: 11, fontWeight: 600, letterSpacing: 1 }}>INTEL</span>
+        <span style={{ fontSize: 16, fontWeight: 700 }}>BIG12</span>
+        <svg width="9" height="6" viewBox="0 0 9 6"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+      </span>}
+      activeTab="Intel"
+      navRight={
+        <div style={{ width: 32, height: 32, borderRadius: 16, border: `0.5px solid ${FH.hairlineStrong}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" stroke={FH.cream} strokeWidth="1.6" fill="none" strokeLinecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3 3"/></svg>
+        </div>
+      }>
+      <div style={{ padding: '0 16px 20px', overflow:'auto', height:'100%' }}>
+        {/* better two-tab pattern */}
+        <div style={{ display:'flex', gap: 24, padding: '8px 4px 14px', borderBottom: `0.5px solid ${FH.hairline}` }}>
+          <div style={{ fontSize: 14, color: FH.creamDim, fontWeight: 600 }}>My team</div>
+          <div style={{ fontSize: 14, color: FH.cream, fontWeight: 700, position:'relative' }}>
+            Across the league
+            <div style={{ position:'absolute', bottom: -14, left: 0, right: 0, height: 2, background: FH.gold }}/>
+          </div>
+        </div>
+
+        {/* filter row */}
+        <div style={{ display:'flex', gap: 6, padding: '14px 0 12px', overflow:'hidden' }}>
+          {[{l:'All',on:true,n:12},{l:'Injuries',n:3},{l:'Waivers',n:5},{l:'Trades',n:2},{l:'Drops',n:2}].map(f => (
+            <div key={f.l} style={{
+              display:'flex', alignItems:'center', gap: 6,
+              padding: '6px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+              background: f.on ? FH.goldFaint : 'transparent',
+              color: f.on ? FH.gold : FH.creamDim,
+              border: f.on ? 'none' : `0.5px solid ${FH.hairlineStrong}`,
+            }}>
+              {f.l}
+              <span style={{ fontSize: 10, fontWeight: 700, color: f.on ? FH.gold : FH.creamFaint }}>{f.n}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* grouped date headers */}
+        <div style={{ fontSize: 10, color: FH.creamFaint, fontWeight: 700, letterSpacing: 1.2, padding: '6px 0' }}>TODAY</div>
+        <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
+          {signals.slice(0, 2).map((s, i) => <SignalRow key={i} s={s}/>)}
+        </div>
+        <div style={{ fontSize: 10, color: FH.creamFaint, fontWeight: 700, letterSpacing: 1.2, padding: '16px 0 6px' }}>EARLIER THIS WEEK</div>
+        <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
+          {signals.slice(2).map((s, i) => <SignalRow key={i} s={s}/>)}
+        </div>
+      </div>
+    </PhoneShell>
+  );
+}
+
+function SignalRow({ s }) {
+  return (
+    <Card pad={14} style={{ borderLeft: `2px solid ${s.tone}` }}>
+      <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, color: FH.creamFaint }}>{s.roster}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: FH.cream }}>{s.name}</span>
+        <span style={{ fontSize: 11, color: s.tone, fontWeight: 600 }}>· {s.change}</span>
+        <span style={{ marginLeft:'auto', fontSize: 10, color: FH.creamFaint }}>{s.time}</span>
+      </div>
+      <div style={{ fontSize: 12, color: FH.creamDim, marginTop: 6, lineHeight: 1.4 }}>{s.note}</div>
+      <div style={{ marginTop: 8, display:'flex', alignItems:'center', gap: 6 }}>
+        <Avatar initial={s.who[0].toUpperCase()} size={16}/>
+        <span style={{ fontSize: 10, color: FH.creamDim }}>on <span style={{ color: FH.cream, fontWeight: 600 }}>{s.who}</span>'s roster · {s.src}</span>
+      </div>
+    </Card>
+  );
+}
+
+// ────────────────────────────────────────────────
+// AFTER · AI Chat — league-aware suggestions grouped
+// ────────────────────────────────────────────────
+function AfterAIChat() {
+  return (
+    <PhoneShell navTitle="AI Chat" activeTab="AI Chat"
+      navLeft={
+        <div style={{ padding: '5px 10px', borderRadius: 999, background: FH.bgElev1, fontSize: 11, fontWeight: 600, color: FH.cream, display:'flex', alignItems:'center', gap: 4 }}>
+          BIG12 <svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+        </div>
+      }
+      navRight={
+        <div style={{ width: 32, height: 32, borderRadius: 16, border: `0.5px solid ${FH.hairlineStrong}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" stroke={FH.cream} strokeWidth="1.5" fill="none" strokeLinecap="round"><path d="M7 3v4l2.5 1.5"/><circle cx="7" cy="7" r="5"/></svg>
+        </div>
+      }>
+      <div style={{ padding: '0 16px 20px', display:'flex', flexDirection:'column', height:'100%' }}>
+        {/* hero */}
+        <div style={{ textAlign:'center', padding: '18px 0 22px' }}>
+          <div style={{ width: 44, height: 44, margin: '0 auto', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="34" height="34" viewBox="0 0 34 34" fill={FH.gold}>
+              <path d="M17 3l2.2 5.8L25 11l-5.8 2.2L17 19l-2.2-5.8L9 11l5.8-2.2z" opacity="0.9"/>
+              <path d="M26 18l1 2.5 2.5 1-2.5 1L26 25l-1-2.5-2.5-1 2.5-1z" opacity="0.6"/>
+            </svg>
+          </div>
+          <div style={{ ...T.h1(), fontSize: 20, marginTop: 4 }}>Ask about BIG12</div>
+          <div style={{ fontSize: 12, color: FH.creamDim, marginTop: 4 }}>4 seasons · 56 weeks · 12 managers indexed</div>
+        </div>
+
+        {/* category groups */}
+        {[
+          { t:'THIS WEEK',       c: FH.gold, q:['Should I start Jacoby Brissett or Mac Jones?', 'Who on waivers fits my RB gap?'] },
+          { t:'LEAGUE HISTORY',  c: FH.info, q:['Who had the best draft ever?', 'Show the all-time records'] },
+          { t:'HEAD-TO-HEAD',    c: FH.win,  q:['Compare me vs kozmania', 'Toughest opponent in 2024?'] },
+        ].map((g, gi) => (
+          <div key={g.t} style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, color: g.c, fontWeight: 700, letterSpacing: 1.2, marginBottom: 8 }}>{g.t}</div>
+            <div style={{ display:'flex', flexDirection:'column', gap: 6 }}>
+              {g.q.map(q => (
+                <div key={q} style={{
+                  background: FH.bgElev1,
+                  border: `0.5px solid ${FH.hairline}`,
+                  padding: '11px 14px', borderRadius: 12,
+                  display:'flex', alignItems:'center', gap: 10,
+                }}>
+                  <div style={{ flex: 1, fontSize: 13, color: FH.cream, lineHeight: 1.35 }}>{q}</div>
+                  <svg width="12" height="12" viewBox="0 0 12 12" stroke={FH.gold} strokeWidth="1.6" fill="none" strokeLinecap="round"><path d="M1 6h10M7 2l4 4-4 4"/></svg>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* composer stuck to bottom */}
+        <div style={{ marginTop:'auto', display:'flex', alignItems:'center', gap: 8, padding: '10px 12px', background: FH.bgElev2, borderRadius: 999, border: `0.5px solid ${FH.hairlineStrong}` }}>
+          <div style={{ flex: 1, fontSize: 13, color: FH.creamFaint }}>Ask anything about your league…</div>
+          <div style={{ width: 30, height: 30, borderRadius: 15, background: FH.gold, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" stroke="#1A1A1A" strokeWidth="2" fill="none" strokeLinecap="round"><path d="M7 11V3M3 7l4-4 4 4"/></svg>
+          </div>
+        </div>
+      </div>
+    </PhoneShell>
+  );
+}
+
+// ────────────────────────────────────────────────
+// AFTER · Profile — useful content in empty space
+// ────────────────────────────────────────────────
+function AfterProfile() {
+  return (
+    <PhoneShell navTitle="Profile" activeTab="Profile" navRight={
+      <svg width="20" height="20" viewBox="0 0 20 20" stroke={FH.cream} strokeWidth="1.6" fill="none" strokeLinecap="round"><circle cx="10" cy="10" r="1.2"/><path d="M10 3.5v2M10 14.5v2M3.5 10h2M14.5 10h2M5.5 5.5l1.5 1.5M13 13l1.5 1.5M5.5 14.5L7 13M13 7l1.5-1.5"/></svg>
+    }>
+      <div style={{ padding: '0 16px 20px', overflow:'auto', height:'100%' }}>
+        <div style={{ textAlign:'center', padding: '10px 0 18px' }}>
+          <div style={{ width: 72, height: 72, borderRadius: 36, margin: '0 auto',
+            background: `radial-gradient(circle at 30% 30%, rgba(201,169,110,0.35), rgba(201,169,110,0.08))`,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            border: `1px solid ${FH.hairlineStrong}` }}>
+            <span style={{ ...T.num(28), color: FH.gold }}>FN</span>
+          </div>
+          <div style={{ ...T.h1(), fontSize: 20, marginTop: 10 }}>Frank Nardone</div>
+          <div style={{ fontSize: 12, color: FH.creamDim, marginTop: 2 }}>Commissioner · joined March 2026</div>
+        </div>
+
+        {/* career stats strip */}
+        <Card pad={14}>
+          <Eyebrow>CAREER · ACROSS 4 LEAGUES</Eyebrow>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 8, marginTop: 12 }}>
+            {[['127–94','Record'],['57%','Win rate'],['3','Titles'],['6','Playoff apps']].map(([v, l]) => (
+              <div key={l}>
+                <div style={{ ...T.num(18) }}>{v}</div>
+                <div style={{ fontSize: 10, color: FH.creamDim, marginTop: 3 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div style={{ marginTop: 18, display:'flex', alignItems:'center', gap: 10, marginBottom: 8 }}>
+          <GoldRule/>
+          <Eyebrow>CONNECTED ACCOUNTS</Eyebrow>
+        </div>
+        <Card pad={0}>
+          {[
+            { l:'Sleeper', s:'Frank · 3 leagues',  ok:true, i:'S' },
+            { l:'Yahoo',   s:'fnardone@… · 1 league', ok:true, i:'Y' },
+            { l:'ESPN',    s:'Coming in V2',    ok:false, i:'E' },
+          ].map((a, i, arr) => (
+            <div key={a.l} style={{ display:'flex', alignItems:'center', padding:'12px 14px', borderBottom: i < arr.length -1 ? `0.5px solid ${FH.hairline}` : 'none' }}>
+              <Avatar initial={a.i} size={28}/>
+              <div style={{ flex: 1, marginLeft: 10 }}>
+                <div style={{ fontSize: 14, color: FH.cream, fontWeight: 600 }}>{a.l}</div>
+                <div style={{ fontSize: 11, color: FH.creamDim, marginTop: 1 }}>{a.s}</div>
+              </div>
+              <div style={{ fontSize: 11, color: a.ok ? FH.win : FH.creamFaint, fontWeight: 600,
+                padding: '4px 9px', borderRadius: 999,
+                background: a.ok ? 'rgba(111,191,138,0.1)' : FH.bgElev2 }}>
+                {a.ok ? 'Connected' : 'Soon'}
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        <div style={{ marginTop: 18, display:'flex', alignItems:'center', gap: 10, marginBottom: 8 }}>
+          <GoldRule/>
+          <Eyebrow>MY LEAGUES</Eyebrow>
+        </div>
+        {[
+          { n:'BIG12',        p:'Sleeper', y:4, rec:'30–26', active:true },
+          { n:'JGFF',         p:'Sleeper', y:7, rec:'56–42', active:false },
+          { n:'Blakes Shoes', p:'Sleeper', y:5, rec:'38–32', active:false },
+          { n:'Blake\'s Shoes', p:'Yahoo', y:14, rec:'102–96', active:false },
+        ].map((lg, i, a) => (
+          <div key={lg.n} style={{
+            display:'flex', alignItems:'center', padding: '12px 2px',
+            borderBottom: i < a.length -1 ? `0.5px solid ${FH.hairline}` : 'none',
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+                <div style={{ fontSize: 14, color: FH.cream, fontWeight: 700 }}>{lg.n}</div>
+                {lg.active && <span style={{ fontSize: 9, fontWeight: 700, color: FH.gold, letterSpacing: 1, padding:'2px 6px', background: FH.goldFaint, borderRadius: 999 }}>ACTIVE</span>}
+              </div>
+              <div style={{ fontSize: 11, color: FH.creamDim, marginTop: 2, letterSpacing: 0.2 }}>{lg.p} · {lg.y} seasons · {lg.rec}</div>
+            </div>
+            <svg width="7" height="12" viewBox="0 0 7 12" stroke={FH.creamFaint} strokeWidth="1.5" fill="none" strokeLinecap="round"><path d="M1 1l5 5-5 5"/></svg>
+          </div>
+        ))}
+      </div>
+    </PhoneShell>
+  );
+}
+
+Object.assign(window, { AfterDashboard, AfterAnalytics, AfterStandings, AfterIntel, AfterAIChat, AfterProfile });
+
+</script>
+
+<!-- ===== system.jsx ===== -->
+<script type="text/babel">
+// System proposals + findings artboards.
+
+// ────────────────────────────────────────────────
+// System proposal — refined design tokens for FantasyHub
+// ────────────────────────────────────────────────
+function SystemProposal() {
+  return (
+    <div style={{
+      width: 820, height: 1180, background: FH.bg, color: FH.cream,
+      fontFamily: FH.sans, padding: 36, boxSizing:'border-box', overflow:'hidden',
+    }}>
+      <div style={{ fontSize: 11, color: FH.gold, fontWeight: 700, letterSpacing: 1.5 }}>SYSTEM PROPOSAL</div>
+      <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginTop: 6 }}>Tighten the palette, recast the gold</div>
+      <div style={{ fontSize: 13, color: FH.creamDim, marginTop: 6, maxWidth: 640, lineHeight: 1.5 }}>
+        The old-gold accent is the best thing about the current design — it reads editorial, not default dark-mode. But it's currently doing eight jobs.
+        Here's a tighter role assignment so it earns its weight.
+      </div>
+
+      {/* Color — old & new roles */}
+      <div style={{ marginTop: 28 }}>
+        <div style={{ fontSize: 11, color: FH.gold, fontWeight: 700, letterSpacing: 1.2, marginBottom: 12 }}>COLOR</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap: 10 }}>
+          {[
+            { c: FH.bg, name:'bg', hex:'#141312', note:'warmer charcoal' },
+            { c: FH.bgElev1, name:'surface', hex:'#1C1A17', note:'cards' },
+            { c: FH.bgElev2, name:'elev', hex:'#24211D', note:'modals' },
+            { c: FH.cream, name:'text', hex:'#E8E2D6', note:'primary' },
+            { c: FH.creamDim, name:'dim', hex:'62%',     note:'secondary' },
+            { c: FH.creamFaint, name:'faint', hex:'38%', note:'tertiary' },
+          ].map(s => (
+            <div key={s.name}>
+              <div style={{ width:'100%', aspectRatio:'1/1', background: s.c, borderRadius: 12, border: `0.5px solid ${FH.hairlineStrong}` }}/>
+              <div style={{ fontSize: 11, fontWeight: 600, marginTop: 6 }}>{s.name}</div>
+              <div style={{ fontSize: 10, color: FH.creamFaint, fontFamily: FH.display }}>{s.hex}</div>
+              <div style={{ fontSize: 10, color: FH.creamDim, marginTop: 2 }}>{s.note}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Gold usage rule */}
+      <div style={{ marginTop: 24, display:'grid', gridTemplateColumns:'1fr 1fr', gap: 18 }}>
+        <div style={{ background: FH.bgElev1, borderRadius: 14, padding: 18, border: `0.5px solid ${FH.hairline}` }}>
+          <div style={{ fontSize: 10, color: FH.loss, fontWeight: 700, letterSpacing: 1.2 }}>GOLD TODAY · 8 JOBS</div>
+          <ul style={{ margin: '10px 0 0', paddingLeft: 14, fontSize: 12, color: FH.creamDim, lineHeight: 1.8 }}>
+            <li>Section eyebrows (every one)</li>
+            <li>"See All" links</li>
+            <li>Active tab background</li>
+            <li>Active nav-icon tint</li>
+            <li>Badge pills (ACTIVE, Sleeper, Yahoo)</li>
+            <li>Icon strokes</li>
+            <li>Streak color</li>
+            <li>Numeric highlight</li>
+          </ul>
+        </div>
+        <div style={{ background: FH.bgElev1, borderRadius: 14, padding: 18, border: `0.5px solid ${FH.gold}40` }}>
+          <div style={{ fontSize: 10, color: FH.gold, fontWeight: 700, letterSpacing: 1.2 }}>GOLD PROPOSED · 3 JOBS</div>
+          <ul style={{ margin: '10px 0 0', paddingLeft: 14, fontSize: 12, color: FH.cream, lineHeight: 1.8 }}>
+            <li><strong>Active nav & tabs.</strong> The single "where am I" cue.</li>
+            <li><strong>Key numeric moments.</strong> Streaks, championships, insights.</li>
+            <li><strong>Primary CTAs.</strong> Submit, Preview, Send.</li>
+          </ul>
+          <div style={{ marginTop: 12, fontSize: 11, color: FH.creamDim, borderTop: `0.5px solid ${FH.hairline}`, paddingTop: 10, lineHeight: 1.5 }}>
+            Section eyebrows become cream/70%. Provider badges become neutral pills with the provider color as a left dot. "See All" becomes cream/dim with a chevron.
+          </div>
+        </div>
+      </div>
+
+      {/* Typography scale */}
+      <div style={{ marginTop: 28 }}>
+        <div style={{ fontSize: 11, color: FH.gold, fontWeight: 700, letterSpacing: 1.2, marginBottom: 12 }}>TYPE</div>
+        <div style={{ background: FH.bgElev1, borderRadius: 14, padding: 20, border: `0.5px solid ${FH.hairline}` }}>
+          <div style={{ display:'grid', gridTemplateColumns:'auto 1fr auto', gap: '14px 24px', alignItems:'baseline' }}>
+            {[
+              { name:'display.num', demo:<span style={T.num(40)}>103.0</span>, spec:'Fraktion Mono · 40/1 · -0.5' },
+              { name:'h1',          demo:<span style={T.h1()}>You vs kozmania</span>, spec:'SF Display · 22/1.15 · 700' },
+              { name:'body',        demo:<span style={T.body()}>A loss ends your win streak.</span>, spec:'SF Text · 15/1.4 · 500' },
+              { name:'eyebrow',     demo:<span style={T.eyebrow()}>STREAK · ACTIVE</span>, spec:'SF Text · 11/1 · 600 · 1.2 tracking' },
+              { name:'label',       demo:<span style={T.label()}>Updated 2h ago</span>, spec:'SF Text · 12/1.4 · 500 · 62% cream' },
+              { name:'num.stat',    demo:<span style={{ ...T.num(18), color: FH.win }}>+7.8</span>, spec:'Fraktion Mono · tabular · 18' },
+            ].map(r => (
+              <React.Fragment key={r.name}>
+                <div style={{ fontFamily: FH.display, fontSize: 10, color: FH.creamFaint, textAlign:'right', letterSpacing: 0.3 }}>{r.name}</div>
+                <div>{r.demo}</div>
+                <div style={{ fontSize: 10, color: FH.creamDim, fontFamily: FH.display }}>{r.spec}</div>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Semantic */}
+      <div style={{ marginTop: 24, display:'grid', gridTemplateColumns:'2fr 3fr', gap: 18 }}>
+        <div>
+          <div style={{ fontSize: 11, color: FH.gold, fontWeight: 700, letterSpacing: 1.2, marginBottom: 10 }}>SEMANTIC</div>
+          <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
+            {[
+              { c: FH.win,  n:'win',  h:'#6FBF8A', note:'softer than iOS green' },
+              { c: FH.loss, n:'loss', h:'#D96B6B', note:'warm red, cream-aligned' },
+              { c: FH.tie,  n:'tie',  h:'#D6B461', note:'distinct from gold' },
+              { c: FH.info, n:'info', h:'#7FA8C9', note:'for transactions' },
+            ].map(r => (
+              <div key={r.n} style={{ display:'flex', alignItems:'center', gap: 12 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: r.c }}/>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{r.n}</div>
+                  <div style={{ fontSize: 10, color: FH.creamDim }}>{r.note}</div>
+                </div>
+                <div style={{ fontSize: 10, color: FH.creamFaint, fontFamily: FH.display }}>{r.h}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Iconography budget */}
+        <div>
+          <div style={{ fontSize: 11, color: FH.gold, fontWeight: 700, letterSpacing: 1.2, marginBottom: 10 }}>ICONOGRAPHY BUDGET</div>
+          <div style={{ background: FH.bgElev1, borderRadius: 14, padding: 16, border: `0.5px solid ${FH.hairline}`, fontSize: 12, color: FH.creamDim, lineHeight: 1.6 }}>
+            <div><strong style={{ color: FH.cream }}>Cut:</strong> emoji in headers (🏆 📅 🔥 🏟 📊), card-ornament icons that duplicate the label.</div>
+            <div style={{ marginTop: 8 }}><strong style={{ color: FH.cream }}>Keep:</strong> nav-bar glyphs, semantic state (streak flame, injury cross), directional chevrons.</div>
+            <div style={{ marginTop: 8 }}><strong style={{ color: FH.cream }}>Style:</strong> 1.6px stroke, currentColor only, no two-tone, 22px bounding box.</div>
+          </div>
+
+          <div style={{ display:'flex', gap: 10, marginTop: 12, color: FH.cream }}>
+            {[<IconDashboard/>, <IconBars/>, <IconSignal/>, <IconChat/>, <IconProfile/>].map((ic, i) => (
+              <div key={i} style={{ width: 44, height: 44, display:'flex', alignItems:'center', justifyContent:'center', background: FH.bgElev1, borderRadius: 10, border: `0.5px solid ${FH.hairline}` }}>{ic}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 28, fontSize: 11, color: FH.creamFaint, letterSpacing: 0.2 }}>
+        Audit · April 2026 · applies across Dashboard, Analytics, Intel, AI Chat, Profile
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────
+// Findings artboard — numbered critique overview (static text)
+// ────────────────────────────────────────────────
+function FindingsIndex() {
+  const findings = [
+    { n:1, s:'Dashboard', t:'No lead story', d:'Three stat cards + an import log ≠ "what happened this week." Lead with a single moment: next matchup, streak, or insight.', imp:'High' },
+    { n:2, s:'Dashboard', t:'"Recent Activity" is system noise', d:'Import Complete / Season Imported are operational logs, not league news. Replace with League Pulse (trades, drops, waiver claims, lineup sets).', imp:'High' },
+    { n:3, s:'Analytics', t:'KPI tiles are table stakes', d:'Seasons / Games / High / Avg are all filler numbers. Lead with an insight sentence; demote KPIs to a single mini-strip.', imp:'High' },
+    { n:4, s:'Analytics', t:'H2H heatmap is cropped', d:'The most interesting visual is peeking below the fold. It deserves a directory-style "drill down" surface, not a See-all link.', imp:'Med' },
+    { n:5, s:'Standings', t:'Rows are information-thin', d:'Rank, name, record, PF, PA. No streak, no form sparkline, no delta. A dense fantasy standings row should carry 2–3× the signal.', imp:'High' },
+    { n:6, s:'Standings', t:'Decimals unaligned', d:'1500.1 / 1441.0 / 1426.5 don\'t form a column — they wander left/right. Switch the stat column to tabular-nums, right-aligned at the decimal.', imp:'Low' },
+    { n:7, s:'Standings', t:'Playoff line is a whisper', d:'Tiny gold text in the corner. Make it a dashed gold rule across the row gap — unmistakable.', imp:'Med' },
+    { n:8, s:'Intel',     t:'Empty state = broken state', d:'"Across the league" loads to "No signals match your filters" with default filters. Default filters should always return data.', imp:'Crit' },
+    { n:9, s:'Intel',     t:'Filter chips overflow silently', d:'Chips clip at "Rankin" — no overflow affordance. Either horizontal-scroll with a fade, or collapse to a single Filter button.', imp:'Med' },
+    { n:10, s:'League',   t:'Page is mostly empty', d:'4 KV rows + empty Managers section. This is the social heart of the product. Managers grid, season timeline, commissioner tools belong here.', imp:'High' },
+    { n:11, s:'AI Chat',  t:'Suggestions are generic', d:'"Compare two managers" / "What were the biggest trades?" reads like any LLM zero-state. Use specific names pulled from this league ("Compare me vs kozmania").', imp:'Med' },
+    { n:12, s:'Profile',  t:'No career stats', d:'You\'ve indexed 4+ leagues of history for this user but show only avatar + name + connected accounts. Career record across all leagues belongs here.', imp:'Med' },
+    { n:13, s:'System',   t:'Gold is overloaded', d:'Section eyebrows + active tab + icon strokes + links + badges + streaks all use gold. When everything is gold, nothing is. Reserve for 3 jobs.', imp:'High' },
+    { n:14, s:'System',   t:'Numerals aren\'t tabular', d:'Switch stat columns to a tabular/monospaced variant so rows line up at the decimal.', imp:'Low' },
+    { n:15, s:'System',   t:'Emoji leaks into pro UI', d:'🏆📅🔥🏟📊 appear in headers. Replace with the same 1.6px stroke icon set for consistency.', imp:'Low' },
+  ];
+  const impColor = { Crit: FH.loss, High: FH.gold, Med: FH.info, Low: FH.creamDim };
+  return (
+    <div style={{
+      width: 820, height: 1180, background: FH.bg, color: FH.cream,
+      fontFamily: FH.sans, padding: 36, boxSizing:'border-box', overflow:'hidden',
+    }}>
+      <div style={{ fontSize: 11, color: FH.gold, fontWeight: 700, letterSpacing: 1.5 }}>AUDIT · 15 FINDINGS</div>
+      <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginTop: 6 }}>What's holding FantasyHub back</div>
+      <div style={{ fontSize: 13, color: FH.creamDim, marginTop: 6, maxWidth: 640, lineHeight: 1.5 }}>
+        Grouped by screen then severity. The pins on the "before" artboards above correspond to the numbers here.
+      </div>
+
+      <div style={{ marginTop: 24, display:'grid', gridTemplateColumns:'auto 1fr auto', columnGap: 20, rowGap: 0 }}>
+        <div style={{ ...T.eyebrow(FH.creamFaint), padding:'8px 0', borderBottom: `0.5px solid ${FH.hairline}` }}>#</div>
+        <div style={{ ...T.eyebrow(FH.creamFaint), padding:'8px 0', borderBottom: `0.5px solid ${FH.hairline}` }}>FINDING</div>
+        <div style={{ ...T.eyebrow(FH.creamFaint), padding:'8px 0', borderBottom: `0.5px solid ${FH.hairline}`, textAlign:'right' }}>IMPACT</div>
+        {findings.map(f => (
+          <React.Fragment key={f.n}>
+            <div style={{ padding:'14px 0', borderBottom: `0.5px solid ${FH.hairline}`, ...T.num(14), color: FH.creamFaint, alignSelf:'start' }}>{String(f.n).padStart(2,'0')}</div>
+            <div style={{ padding:'14px 0', borderBottom: `0.5px solid ${FH.hairline}` }}>
+              <div style={{ display:'flex', alignItems:'baseline', gap: 10 }}>
+                <div style={{ fontSize: 10, color: FH.gold, fontWeight: 700, letterSpacing: 1, width: 72 }}>{f.s.toUpperCase()}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: FH.cream }}>{f.t}</div>
+              </div>
+              <div style={{ fontSize: 12, color: FH.creamDim, marginTop: 4, lineHeight: 1.5, paddingLeft: 82 }}>{f.d}</div>
+            </div>
+            <div style={{ padding:'14px 0', borderBottom: `0.5px solid ${FH.hairline}`, alignSelf:'start' }}>
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
+                color: impColor[f.imp], padding:'3px 8px', borderRadius: 999,
+                background: `${impColor[f.imp]}1a`, border: `0.5px solid ${impColor[f.imp]}33`,
+              }}>{f.imp.toUpperCase()}</span>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { SystemProposal, FindingsIndex });
+
+</script>
+
+<!-- ===== briefing.jsx ===== -->
+<script type="text/babel">
+// Today's Briefing — three synthesis-style variations for Intel > My team.
+// All share the same top-of-screen shell (league pill, title, tab) so the
+// variations are purely about how AI-synthesized takeaways are presented.
+
+// ─── Shared: Intel shell ──────────────────────────────────────────────
+function IntelShell({ children, activeTab = 'My team' }) {
+  return (
+    <PhoneShell
+      navTitle={
+        <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+          <span style={{ color: FH.creamDim, fontSize: 11, fontWeight: 600, letterSpacing: 1 }}>INTEL</span>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>BIG12</span>
+          <svg width="9" height="6" viewBox="0 0 9 6"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+        </span>
+      }
+      activeTab="Intel"
+      navRight={
+        <div style={{ width: 32, height: 32, borderRadius: 16, border: `0.5px solid ${FH.hairlineStrong}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" stroke={FH.cream} strokeWidth="1.6" fill="none" strokeLinecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3 3"/></svg>
+        </div>
+      }>
+      <div style={{ overflow:'auto', height:'100%' }}>
+        {/* under-nav tabs */}
+        <div style={{ display:'flex', gap: 24, padding: '6px 20px 14px', borderBottom: `0.5px solid ${FH.hairline}` }}>
+          {['My team', 'Across the league'].map(t => (
+            <div key={t} style={{ position:'relative', fontSize: 14, fontWeight: 700, color: t === activeTab ? FH.cream : FH.creamDim }}>
+              {t}
+              {t === activeTab && <div style={{ position:'absolute', left: 0, right: 0, bottom: -14, height: 2, background: FH.gold }}/>}
+            </div>
+          ))}
+        </div>
+        {children}
+      </div>
+    </PhoneShell>
+  );
+}
+
+// ─── Source glyph (stroke only, inherits color) ───────────────────────
+const SrcGlyph = ({ kind, size = 11 }) => {
+  const s = { stroke: 'currentColor', strokeWidth: 1.4, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' };
+  switch (kind) {
+    case 'injury':  return <svg width={size} height={size} viewBox="0 0 12 12" {...s}><path d="M5 1v4H1v2h4v4h2V7h4V5H7V1z"/></svg>;
+    case 'rank':    return <svg width={size} height={size} viewBox="0 0 12 12" {...s}><path d="M2 9l3-3 2 2 3-4"/><path d="M9 2h1v2"/></svg>;
+    case 'startsit':return <svg width={size} height={size} viewBox="0 0 12 12" {...s}><path d="M2 3h7l-2-2M10 9H3l2 2"/></svg>;
+    case 'reddit':  return <svg width={size} height={size} viewBox="0 0 12 12" {...s}><circle cx="6" cy="7" r="4"/><circle cx="3" cy="5" r="1"/><circle cx="9" cy="5" r="1"/><path d="M4 8c.8.7 1.3 1 2 1s1.2-.3 2-1"/></svg>;
+    case 'twitter': return <svg width={size} height={size} viewBox="0 0 12 12" {...s}><path d="M1 2l4 5-4 3M5 2h2l4 8h-2z"/></svg>;
+    case 'news':    return <svg width={size} height={size} viewBox="0 0 12 12" {...s}><rect x="1" y="2" width="8" height="8" rx="1"/><path d="M3 4h4M3 6h4M3 8h3M9 5h2v4a1 1 0 01-1 1"/></svg>;
+    default:        return null;
+  }
+};
+
+// Source pill: tiny corner tag
+function SourcePill({ kind, label, tone = FH.creamDim }) {
+  return (
+    <span style={{
+      display:'inline-flex', alignItems:'center', gap: 4,
+      padding:'2px 7px', borderRadius: 999,
+      background: 'rgba(232,226,214,0.06)', border: `0.5px solid ${FH.hairline}`,
+      fontSize: 10, fontWeight: 600, color: tone, letterSpacing: 0.2,
+    }}>
+      <span style={{ display:'flex', color: tone }}><SrcGlyph kind={kind} size={10}/></span>
+      {label}
+    </span>
+  );
+}
+
+// Confidence chip (dot scale)
+function Confidence({ n, max = 4, tone = FH.gold }) {
+  return (
+    <span style={{ display:'inline-flex', gap: 2, alignItems:'center' }}>
+      {[...Array(max)].map((_, i) => (
+        <span key={i} style={{
+          width: 5, height: 5, borderRadius: 3,
+          background: i < n ? tone : FH.hairlineStrong,
+        }}/>
+      ))}
+    </span>
+  );
+}
+
+// Consolidated briefing data, shared across variations
+const BRIEFING = {
+  league: 'BIG12',
+  week: 14,
+  wx: { kickoff: 'Sun 1:00 PM', matchup: 'kozmania', winProb: 78 },
+  items: [
+    {
+      tag: 'SIT',
+      tone: FH.loss,
+      player: 'Mac Jones', slot: 'QB', team: 'SF',
+      headline: 'Sit Mac Jones — stream Brissett instead',
+      why: 'Consensus ranks dropped Mac to QB34 overnight after Shanahan hinted at a shortened leash; Brissett projects +6.2 in a home PPR matchup vs ARI.',
+      delta: '−6.2 pts',
+      sources: [
+        { kind:'rank',    label:'FantasyPros · QB34 (−9)' },
+        { kind:'twitter', label:'@JeffHowe · "leashed"' },
+        { kind:'startsit',label:'ESPN Start/Sit' },
+      ],
+      confidence: 4,
+      spark: [28, 32, 29, 34, 33, 34, 34],
+    },
+    {
+      tag: 'ADD',
+      tone: FH.win,
+      player: 'Brandon Aubrey', slot: 'K', team: 'DAL',
+      headline: 'Grab Aubrey — streaming K with a Week 14 ceiling',
+      why: 'Trending in 47% of Sleeper leagues. Beat writers expect 4+ attempts vs CIN; r/fantasyfootball "waiver darling" post has 3.1k upvotes.',
+      delta: '+3.4 pts',
+      sources: [
+        { kind:'rank',    label:'FantasyPros · K4' },
+        { kind:'reddit',  label:'r/ff · 3.1k ↑' },
+        { kind:'twitter', label:'@ToddArcher' },
+      ],
+      confidence: 3,
+      spark: [6, 7, 8, 10, 11, 12, 14],
+    },
+    {
+      tag: 'WATCH',
+      tone: FH.tie,
+      player: 'Garrett Wilson', slot: 'WR', team: 'NYJ',
+      headline: 'Garrett Wilson questionable — monitor Friday',
+      why: 'Limited Wed/Thu with a hamstring. Practice report expected by 3pm Fri. If out, Allen Lazard absorbs 8+ targets.',
+      delta: 'TBD',
+      sources: [
+        { kind:'injury',  label:'Questionable' },
+        { kind:'news',    label:'NFL Network' },
+        { kind:'twitter', label:'@RichCimini' },
+      ],
+      confidence: 2,
+      spark: [22, 24, 20, 23, 18, 16, 17],
+    },
+  ],
+};
+
+// ─── Variation A · EDITORIAL ─────────────────────────────────────────
+// A sports-section feel. One lead item, then two "briefs" under it.
+// Photographic feel via warm gradient plates, serif-ish display via
+// large SF Display, calm hierarchy.
+function BriefingEditorial() {
+  const [lead, ...rest] = BRIEFING.items;
+  return (
+    <IntelShell>
+      <div style={{ padding: '14px 16px 24px' }}>
+        {/* masthead */}
+        <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 11, background: FH.gold, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="#1A1A1A"><path d="M5 0l1.3 3.4L10 5l-3.7 1.6L5 10 3.7 6.6 0 5l3.7-1.6z"/></svg>
+          </div>
+          <div style={{ fontSize: 11, color: FH.gold, fontWeight: 700, letterSpacing: 1.4 }}>TODAY&apos;S BRIEFING · THU · WEEK 14</div>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 24, fontWeight: 700, color: FH.cream, letterSpacing: -0.4, lineHeight: 1.2 }}>
+          Three things <span style={{ color: FH.gold }}>your roster</span> needs from you today.
+        </div>
+        <div style={{ marginTop: 6, fontSize: 12, color: FH.creamDim, lineHeight: 1.5 }}>
+          Synthesized at 9:14am from <strong style={{ color: FH.cream, fontWeight: 600 }}>47 signals</strong> across FantasyPros, ESPN, Rotoworld, r/fantasyfootball, and 12 beat reporters.
+        </div>
+
+        {/* LEAD item — full-bleed card with headline typography */}
+        <div style={{
+          marginTop: 20, borderRadius: 20, overflow:'hidden',
+          background: `linear-gradient(145deg, rgba(217,107,107,0.16) 0%, rgba(28,26,23,1) 55%)`,
+          border: `0.5px solid ${FH.hairlineStrong}`,
+        }}>
+          <div style={{ padding: '18px 20px 14px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+              <span style={{
+                fontSize: 10, fontWeight: 800, letterSpacing: 1.5,
+                color: '#1A1A1A', background: lead.tone, padding:'3px 8px', borderRadius: 4,
+              }}>{lead.tag}</span>
+              <span style={{ fontSize: 10, color: FH.creamDim, fontWeight: 600, letterSpacing: 0.4 }}>{lead.slot} · {lead.team}</span>
+              <span style={{ marginLeft:'auto' }}><Confidence n={lead.confidence}/></span>
+            </div>
+            <div style={{ marginTop: 10, fontSize: 20, fontWeight: 700, color: FH.cream, letterSpacing: -0.3, lineHeight: 1.25 }}>
+              {lead.headline}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 13, color: FH.creamDim, lineHeight: 1.5 }}>
+              {lead.why}
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap: 6, marginTop: 12 }}>
+              {lead.sources.map((s, i) => <SourcePill key={i} {...s}/>)}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap: 10, marginTop: 14, paddingTop: 12, borderTop: `0.5px solid ${FH.hairline}` }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: FH.creamFaint, fontWeight: 600, letterSpacing: 0.5 }}>PROJECTED IMPACT</div>
+                <div style={{ ...T.num(20), color: lead.tone, marginTop: 3 }}>{lead.delta}</div>
+              </div>
+              <div style={{ padding: '10px 16px', borderRadius: 10, background: FH.gold, color:'#1A1A1A', fontSize: 12, fontWeight: 700, letterSpacing: 0.2 }}>
+                Apply change →
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Rest — lighter brief format */}
+        {rest.map((it, i) => (
+          <div key={it.player} style={{ marginTop: 14, display:'flex', gap: 12 }}>
+            <div style={{
+              width: 36, flexShrink: 0, display:'flex', flexDirection:'column', alignItems:'center', paddingTop: 2,
+            }}>
+              <div style={{ ...T.num(26), color: it.tone, fontWeight: 600 }}>{String(i + 2).padStart(2,'0')}</div>
+              <div style={{ width: 1, flex: 1, background: FH.hairline, marginTop: 4 }}/>
+            </div>
+            <div style={{ flex: 1, paddingBottom: 10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap: 6 }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 800, letterSpacing: 1.3,
+                  color: it.tone, padding:'1px 6px', borderRadius: 3,
+                  border: `0.5px solid ${it.tone}66`,
+                }}>{it.tag}</span>
+                <span style={{ fontSize: 10, color: FH.creamFaint, fontWeight: 600, letterSpacing: 0.5 }}>{it.slot} · {it.team}</span>
+                <span style={{ marginLeft:'auto', fontSize: 11, color: it.tone, fontWeight: 700, fontVariantNumeric:'tabular-nums' }}>{it.delta}</span>
+              </div>
+              <div style={{ marginTop: 4, fontSize: 15, fontWeight: 600, color: FH.cream, lineHeight: 1.3 }}>
+                {it.headline}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: FH.creamDim, lineHeight: 1.45 }}>
+                {it.why}
+              </div>
+              <div style={{ display:'flex', gap: 6, marginTop: 8, flexWrap:'wrap' }}>
+                {it.sources.slice(0,2).map((s, j) => <SourcePill key={j} {...s}/>)}
+                <span style={{ fontSize: 10, color: FH.creamFaint, alignSelf:'center' }}>+{it.sources.length - 2} more</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </IntelShell>
+  );
+}
+
+// ─── Variation B · SCORECARD ─────────────────────────────────────────
+// Dense, numbers-first. Each takeaway is a card with a big delta number,
+// a 7-day signal line, and source strips. Feels like a trading dashboard.
+function BriefingScorecard() {
+  return (
+    <IntelShell>
+      <div style={{ padding: '14px 16px 24px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize: 10, color: FH.gold, fontWeight: 700, letterSpacing: 1.4 }}>TODAY&apos;S BRIEFING</div>
+            <div style={{ marginTop: 4, fontSize: 18, fontWeight: 700, color: FH.cream, letterSpacing: -0.2 }}>
+              Your roster in 3 moves
+            </div>
+          </div>
+          <div style={{ textAlign:'right' }}>
+            <div style={{ ...T.num(22), color: FH.gold }}>+1.6</div>
+            <div style={{ fontSize: 9, color: FH.creamFaint, letterSpacing: 0.4, marginTop: 2 }}>NET PROJ. DELTA</div>
+          </div>
+        </div>
+
+        {/* confidence + sources summary row */}
+        <div style={{
+          marginTop: 12, padding: '10px 12px',
+          background: FH.bgElev1, border: `0.5px solid ${FH.hairline}`, borderRadius: 10,
+          display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap: 12,
+        }}>
+          {[
+            ['47', 'signals'],
+            ['12', 'sources'],
+            ['9:14a','synced'],
+          ].map(([v,l]) => (
+            <div key={l}>
+              <div style={{ ...T.num(14) }}>{v}</div>
+              <div style={{ fontSize: 9, color: FH.creamFaint, letterSpacing: 0.5, marginTop: 2 }}>{l.toUpperCase()}</div>
+            </div>
+          ))}
+        </div>
+
+        {BRIEFING.items.map((it) => (
+          <Card key={it.player} pad={0} style={{ marginTop: 12, overflow:'hidden' }}>
+            {/* top band: tag + player + delta */}
+            <div style={{ display:'flex', alignItems:'stretch' }}>
+              <div style={{
+                width: 52, background: it.tone, color:'#1A1A1A',
+                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                padding: '10px 0',
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2 }}>{it.tag}</div>
+                <div style={{ fontSize: 9, fontWeight: 700, marginTop: 2, opacity: 0.8 }}>{it.slot}</div>
+              </div>
+              <div style={{ flex: 1, padding: '10px 14px' }}>
+                <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: FH.cream, lineHeight: 1.1 }}>{it.player}</div>
+                    <div style={{ fontSize: 10, color: FH.creamDim, marginTop: 2, letterSpacing: 0.3 }}>{it.team} · {it.slot}</div>
+                  </div>
+                  <div style={{ ...T.num(20), color: it.tone }}>{it.delta}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* body: headline + why + spark */}
+            <div style={{ padding: '12px 14px 0' }}>
+              <div style={{ fontSize: 13, color: FH.cream, fontWeight: 600, lineHeight: 1.35 }}>{it.headline}</div>
+              <div style={{ fontSize: 11, color: FH.creamDim, marginTop: 5, lineHeight: 1.45 }}>{it.why}</div>
+            </div>
+
+            {/* signal strip — 7 day ranking movement + sources */}
+            <div style={{ padding: '12px 14px', display:'flex', alignItems:'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 9, color: FH.creamFaint, letterSpacing: 0.5, marginBottom: 4 }}>RANK · 7D</div>
+                <Sparkline data={it.spark} w={110} h={22} color={it.tone} fill/>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 9, color: FH.creamFaint, letterSpacing: 0.5, marginBottom: 4 }}>CONFIDENCE</div>
+                <div style={{ display:'flex', alignItems:'center', gap: 6 }}>
+                  <Confidence n={it.confidence} tone={it.tone}/>
+                  <span style={{ fontSize: 11, color: FH.creamDim, fontWeight: 600 }}>{['Low','Low','Med','High','Very high'][it.confidence]}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* sources row */}
+            <div style={{ padding: '0 14px 12px', display:'flex', gap: 6, flexWrap:'wrap' }}>
+              {it.sources.map((s, i) => <SourcePill key={i} {...s}/>)}
+            </div>
+
+            {/* actions footer */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', borderTop: `0.5px solid ${FH.hairline}` }}>
+              <div style={{ padding: 11, textAlign:'center', fontSize: 12, color: FH.creamDim, fontWeight: 600 }}>Details</div>
+              <div style={{ padding: 11, textAlign:'center', fontSize: 12, color: FH.gold, fontWeight: 700, borderLeft: `0.5px solid ${FH.hairline}` }}>Apply →</div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </IntelShell>
+  );
+}
+
+// ─── Variation C · NARRATIVE STREAM ──────────────────────────────────
+// Paragraph-forward. Reads like a manager reviewing your team at a chalkboard.
+// Name callouts are inline anchors; source citations sit below each paragraph
+// like footnotes.
+function BriefingNarrative() {
+  return (
+    <IntelShell>
+      <div style={{ padding: '16px 16px 24px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+          <div style={{ fontSize: 11, color: FH.gold, fontWeight: 700, letterSpacing: 1.4 }}>TODAY&apos;S BRIEFING · 9:14 AM</div>
+          <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap: 6, fontSize: 10, color: FH.creamDim }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: FH.win }}/>
+            Fresh
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12, fontSize: 19, color: FH.cream, fontWeight: 500, letterSpacing: -0.3, lineHeight: 1.4 }}>
+          Your week comes down to <InlineRef tone={FH.loss}>Mac Jones</InlineRef>. If you start him, you&apos;re betting on a short leash — if you sit him, <InlineRef tone={FH.gold}>Brissett</InlineRef> is the cleanest stream you&apos;ve had in three weeks.
+        </div>
+
+        {/* Paragraph 1 — the Mac Jones verdict */}
+        <Paragraph
+          badge="SIT"
+          tone={FH.loss}
+          label="QB · 49ers"
+          body={<>The consensus dropped <InlineRef tone={FH.loss}>Mac Jones</InlineRef> to <strong style={{ color: FH.cream }}>QB34</strong> (from QB25) overnight. Beat writers caught Shanahan saying the quiet part out loud: Jones is on a leash Sunday. Against a <strong style={{ color: FH.cream }}>SEA</strong> defense that&apos;s given up top-10 QB numbers twice in the last three weeks, Brissett&apos;s home floor still projects <strong style={{ color: FH.win }}>+6.2 over Jones</strong>.</>}
+          sources={BRIEFING.items[0].sources}
+          delta="−6.2"
+          confidence={4}
+        />
+
+        {/* Paragraph 2 — the waiver */}
+        <Paragraph
+          badge="ADD"
+          tone={FH.win}
+          label="K · Cowboys"
+          body={<>At kicker, the obvious move is <InlineRef tone={FH.win}>Brandon Aubrey</InlineRef>. He&apos;s trending in <strong style={{ color: FH.cream }}>47% of Sleeper leagues</strong> this week, Todd Archer had him at four attempts minimum on Tuesday, and the r/fantasyfootball waiver thread pinned him at <strong style={{ color: FH.cream }}>3.1k upvotes</strong>. That&apos;s rare source agreement.</>}
+          sources={BRIEFING.items[1].sources}
+          delta="+3.4"
+          confidence={3}
+        />
+
+        {/* Paragraph 3 — the watch */}
+        <Paragraph
+          badge="WATCH"
+          tone={FH.tie}
+          label="WR · Jets"
+          body={<><InlineRef tone={FH.tie}>Garrett Wilson</InlineRef> was limited Wed/Thu with a hamstring — Rich Cimini expects a final read by <strong style={{ color: FH.cream }}>Fri 3pm</strong>. If Wilson sits, Allen Lazard absorbs eight-plus targets. Have a Wilson-out plan loaded; don&apos;t wait until Sunday morning.</>}
+          sources={BRIEFING.items[2].sources}
+          delta="TBD"
+          confidence={2}
+        />
+
+        {/* footer actions */}
+        <div style={{ marginTop: 18, display:'grid', gridTemplateColumns:'1fr 1fr', gap: 8 }}>
+          <div style={{ padding: '12px 14px', textAlign:'center', borderRadius: 10, background: FH.bgElev1, border: `0.5px solid ${FH.hairline}`, fontSize: 12, color: FH.cream, fontWeight: 600 }}>Ask follow-ups</div>
+          <div style={{ padding: '12px 14px', textAlign:'center', borderRadius: 10, background: FH.gold, color:'#1A1A1A', fontSize: 12, fontWeight: 700 }}>Apply all 3 →</div>
+        </div>
+        <div style={{ marginTop: 12, fontSize: 10, color: FH.creamFaint, textAlign:'center', lineHeight: 1.5 }}>
+          Synthesized from 47 signals · updates Tue Thu Fri Sun
+        </div>
+      </div>
+    </IntelShell>
+  );
+}
+
+function InlineRef({ tone, children }) {
+  return <span style={{
+    fontWeight: 700, color: tone,
+    borderBottom: `1px dashed ${tone}`, paddingBottom: 1,
+  }}>{children}</span>;
+}
+
+function Paragraph({ badge, tone, label, body, sources, delta, confidence }) {
+  return (
+    <div style={{
+      marginTop: 14, padding: '14px 0',
+      borderTop: `0.5px solid ${FH.hairline}`,
+    }}>
+      <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+        <span style={{
+          fontSize: 9, fontWeight: 800, letterSpacing: 1.3,
+          color: tone, padding:'2px 7px', borderRadius: 3,
+          border: `0.5px solid ${tone}66`,
+        }}>{badge}</span>
+        <span style={{ fontSize: 10, color: FH.creamFaint, fontWeight: 600, letterSpacing: 0.3 }}>{label}</span>
+        <span style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap: 8 }}>
+          <Confidence n={confidence} tone={tone}/>
+          <span style={{ ...T.num(13), color: tone }}>{delta}</span>
+        </span>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 13.5, color: FH.cream, lineHeight: 1.55, letterSpacing: -0.05 }}>
+        {body}
+      </div>
+      <div style={{ display:'flex', gap: 6, marginTop: 10, flexWrap:'wrap' }}>
+        {sources.map((s, i) => <SourcePill key={i} {...s}/>)}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { BriefingEditorial, BriefingScorecard, BriefingNarrative, IntelShell, SrcGlyph, SourcePill, Confidence, BRIEFING });
+
+</script>
+
+<!-- ===== player-sheet.jsx ===== -->
+<script type="text/babel">
+// Player Detail Sheet — opened from any briefing takeaway or signal card.
+// Shows: header · AI summary · signal timeline (grouped by source) · matchup
+// · quick actions (start/sit/drop/trade).
+
+function PlayerDetailSheet() {
+  return (
+    <PhoneShell
+      noNav
+      showTabBar={false}
+    >
+      <div style={{ position: 'relative', height: '100%', overflow: 'auto', background: FH.bg }}>
+
+        {/* Sheet grabber + close */}
+        <div style={{ position:'sticky', top: 0, zIndex: 20, background: FH.bg, borderBottom: `0.5px solid ${FH.hairline}` }}>
+          <div style={{ display:'flex', justifyContent:'center', padding: '8px 0 4px' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: FH.hairlineStrong }}/>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: '4px 16px 10px' }}>
+            <div style={{ fontSize: 11, color: FH.creamFaint, fontWeight: 600, letterSpacing: 0.5 }}>PLAYER · INTEL</div>
+            <div style={{ fontSize: 14, color: FH.cream, fontWeight: 600 }}>Done</div>
+          </div>
+        </div>
+
+        {/* Header with gradient plate */}
+        <div style={{
+          padding: '18px 18px 16px',
+          background: 'linear-gradient(160deg, rgba(217,107,107,0.12) 0%, rgba(20,19,18,0) 70%)',
+        }}>
+          <div style={{ display:'flex', alignItems:'flex-start', gap: 12 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 12,
+              background: 'linear-gradient(135deg, #AA0000 0%, #B50808 100%)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              color:'#FFD89C', fontWeight: 800, fontSize: 16, letterSpacing: 0.4,
+              border: `0.5px solid ${FH.hairlineStrong}`,
+            }}>SF</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: FH.cream, letterSpacing: -0.3 }}>Mac Jones</div>
+              <div style={{ marginTop: 3, fontSize: 12, color: FH.creamDim }}>
+                QB · 49ers · #10 · On <span style={{ color: FH.cream, fontWeight: 600 }}>Your Roster</span>
+              </div>
+              <div style={{ display:'flex', gap: 6, marginTop: 8, flexWrap:'wrap' }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 800, letterSpacing: 1.2,
+                  color: FH.loss, padding:'2px 7px', borderRadius: 3,
+                  border: `0.5px solid ${FH.loss}66`,
+                }}>AI SAYS SIT</span>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, color: FH.creamDim,
+                  padding:'2px 7px', borderRadius: 3, background: FH.bgElev1, border: `0.5px solid ${FH.hairline}`,
+                }}>Week 14 · vs SEA</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Numerals strip */}
+          <div style={{
+            marginTop: 14, display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap: 1,
+            background: FH.hairline, borderRadius: 10, overflow:'hidden',
+            border: `0.5px solid ${FH.hairline}`,
+          }}>
+            {[
+              ['PROJ', '11.8', 'pts'],
+              ['RANK', 'QB34', '−9'],
+              ['OWN%', '62', '−4'],
+              ['START%','18', '−22'],
+            ].map(([l, v, d]) => (
+              <div key={l} style={{ background: FH.bgElev1, padding: '10px 6px', textAlign:'center' }}>
+                <div style={{ fontSize: 9, color: FH.creamFaint, letterSpacing: 0.5, fontWeight: 600 }}>{l}</div>
+                <div style={{ ...T.num(18), marginTop: 3 }}>{v}</div>
+                <div style={{ fontSize: 10, color: d.startsWith('−') ? FH.loss : FH.creamDim, fontVariantNumeric:'tabular-nums', marginTop: 2 }}>{d}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* AI SUMMARY */}
+        <div style={{ padding: '6px 18px 18px' }}>
+          <div style={{ ...T.eyebrow() }}>
+            <span style={{ display:'flex', alignItems:'center', gap: 6 }}>
+              <span style={{ width: 14, height: 14, borderRadius: 7, background: FH.gold, display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                <svg width="7" height="7" viewBox="0 0 7 7" fill="#1A1A1A"><path d="M3.5 0L4.4 2.4 7 3.5 4.4 4.6 3.5 7 2.6 4.6 0 3.5 2.6 2.4z"/></svg>
+              </span>
+              AI SUMMARY
+            </span>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.55, color: FH.cream }}>
+            Jones&apos;s stock cratered Wed–Thu. <strong style={{ color: FH.loss }}>Consensus dropped him 9 spots</strong> to QB34 after Shanahan&apos;s "leash" comment; five of six major outlets now rank Brissett higher. Jones&apos;s Week 14 floor is <strong style={{ color: FH.cream }}>4.2 pts</strong>; he&apos;s exceeded 15 in only 2 of his last 7. <strong style={{ color: FH.cream }}>Sit with confidence.</strong>
+          </div>
+          <div style={{ display:'flex', gap: 6, marginTop: 10, alignItems:'center' }}>
+            <Confidence n={4}/>
+            <span style={{ fontSize: 11, color: FH.creamDim, fontWeight: 600 }}>Very high confidence · 47 signals</span>
+          </div>
+        </div>
+
+        {/* SIGNAL TIMELINE */}
+        <div style={{ padding: '0 18px 8px' }}>
+          <div style={{ ...T.eyebrow() }}>SIGNAL TIMELINE · 72H</div>
+        </div>
+        <div style={{ padding: '10px 18px 0' }}>
+          {[
+            { t:'2h ago', kind:'twitter', src:'@JeffHowe · The Athletic', tone: FH.loss,
+              body:'"Shanahan kept Jones on a short leash today. Don&apos;t be surprised to see Brissett for a series or two if it&apos;s bumpy early."' },
+            { t:'6h ago', kind:'rank', src:'FantasyPros · ECR', tone: FH.loss,
+              body:<>Consensus ranking moved <strong style={{ color: FH.cream }}>QB25 → QB34</strong> overnight. Largest drop of the week at the position.</> },
+            { t:'9h ago', kind:'startsit', src:'ESPN Start/Sit', tone: FH.loss,
+              body:'Field Yates moved Jones to the Sit list. "I&apos;m off him in all formats this week."' },
+            { t:'14h ago', kind:'reddit', src:'r/fantasyfootball · 1.2k ↑', tone: FH.tie,
+              body:'Thread "49ers QB situation Week 14" pinned. Community sentiment 71% bearish.' },
+            { t:'1d ago', kind:'news', src:'Rotoworld', tone: FH.creamDim,
+              body:'Practice report: Full participant. No health concern, but usage in question.' },
+            { t:'2d ago', kind:'rank', src:'PFF · Matchup Grades', tone: FH.loss,
+              body:<>SEA pass defense graded <strong style={{ color: FH.cream }}>A−</strong> vs QBs in last 4 games. Matchup rating: <strong style={{ color: FH.loss }}>tough</strong>.</> },
+          ].map((s, i) => (
+            <div key={i} style={{ display:'flex', gap: 10, position:'relative' }}>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', width: 22, flexShrink: 0 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 11, background: FH.bgElev1,
+                  border: `0.5px solid ${FH.hairlineStrong}`, color: s.tone,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                }}><SrcGlyph kind={s.kind} size={11}/></div>
+                {i < 5 && <div style={{ flex: 1, width: 1, background: FH.hairline, marginTop: 3 }}/>}
+              </div>
+              <div style={{ flex: 1, paddingBottom: 14 }}>
+                <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between' }}>
+                  <div style={{ fontSize: 11, color: FH.creamDim, fontWeight: 600 }}>{s.src}</div>
+                  <div style={{ fontSize: 10, color: FH.creamFaint, fontVariantNumeric:'tabular-nums' }}>{s.t}</div>
+                </div>
+                <div style={{ marginTop: 4, fontSize: 12.5, color: FH.cream, lineHeight: 1.5, fontStyle: s.kind === 'twitter' ? 'italic' : 'normal' }}>
+                  {s.body}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* MATCHUP quick snapshot */}
+        <div style={{ padding: '8px 18px 18px' }}>
+          <div style={{ ...T.eyebrow() }}>WEEK 14 MATCHUP</div>
+          <Card style={{ marginTop: 10, padding: 14 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ display:'flex', alignItems:'center', gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>SF</div>
+                <div style={{ fontSize: 10, color: FH.creamFaint }}>at</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>SEA</div>
+              </div>
+              <div style={{ fontSize: 10, color: FH.creamDim }}>Sun · 4:25 PM · Lumen</div>
+            </div>
+            <div style={{ marginTop: 10, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap: 8, fontSize: 11 }}>
+              <Meta label="SPREAD" v="SEA −3"/>
+              <Meta label="O/U" v="43.5"/>
+              <Meta label="IMP. TOTAL" v="20.3"/>
+            </div>
+          </Card>
+        </div>
+
+        {/* QUICK ACTIONS — sticky footer */}
+        <div style={{ height: 88 }}/>
+      </div>
+
+      {/* Sticky action bar */}
+      <div style={{
+        position:'absolute', bottom: 0, left: 0, right: 0, zIndex: 30,
+        padding: '12px 14px 18px',
+        background: 'linear-gradient(to top, rgba(20,19,18,1) 65%, rgba(20,19,18,0))',
+        borderTop: `0.5px solid ${FH.hairline}`,
+      }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap: 8 }}>
+          <ActionBtn label="Bench" icon={<IconDown/>} tone={FH.win} primary/>
+          <ActionBtn label="Trade" icon={<IconTrade/>}/>
+          <ActionBtn label="Drop" icon={<IconDrop/>}/>
+          <ActionBtn label="Mute" icon={<IconMute/>}/>
+        </div>
+      </div>
+    </PhoneShell>
+  );
+}
+
+function Meta({ label, v }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, color: FH.creamFaint, letterSpacing: 0.5, fontWeight: 600 }}>{label}</div>
+      <div style={{ ...T.num(13), marginTop: 3 }}>{v}</div>
+    </div>
+  );
+}
+
+function ActionBtn({ label, icon, tone = FH.cream, primary }) {
+  return (
+    <div style={{
+      padding: '10px 4px', borderRadius: 10, textAlign:'center',
+      background: primary ? tone : FH.bgElev1,
+      border: primary ? 'none' : `0.5px solid ${FH.hairline}`,
+      color: primary ? '#1A1A1A' : tone,
+      display:'flex', flexDirection:'column', alignItems:'center', gap: 4,
+    }}>
+      <div style={{ display:'flex' }}>{icon}</div>
+      <div style={{ fontSize: 11, fontWeight: 700 }}>{label}</div>
+    </div>
+  );
+}
+
+const IconDown  = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2v8M3 7l4 4 4-4"/></svg>;
+const IconTrade = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h9l-2-2M12 10H3l2 2"/></svg>;
+const IconDrop  = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4h8M5 4V2h4v2M4 4l1 8h4l1-8"/></svg>;
+const IconMute  = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l-3 3H2v4h2l3 3zM10 5l3 3M13 5l-3 3"/></svg>;
+
+Object.assign(window, { PlayerDetailSheet });
+
+</script>
+
+
+                
+  <script type="text/babel" data-presets="env,react">
+    const PHONE_W = 390, PHONE_H = 844;
+
+    // Small annotated wrapper: phone + pins + caption
+    function Annotated({ children, pins = [], caption }) {
+      return (
+        <div style={{ position:'relative', width: PHONE_W, height: PHONE_H }}>
+          {children}
+          {pins.map(p => <Pin key={p.n} {...p}/>)}
+          {caption && (
+            <div style={{
+              position:'absolute', bottom:-70, left: 0, right: 0,
+              fontSize: 12, color: 'rgba(40,30,20,0.7)', lineHeight: 1.5,
+              fontFamily:'-apple-system, system-ui, sans-serif',
+            }}>{caption}</div>
+          )}
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <DesignCanvas>
+          {/* ── ROW 0: Overview card ── */}
+          <DCSection id="intro" title="FantasyHub · Design Audit" subtitle="Drag any artboard to reorder. Click a label to focus. Arrows navigate.">
+            <DCArtboard id="findings" label="15 findings · ranked" width={820} height={1180}>
+              <FindingsIndex/>
+            </DCArtboard>
+            <DCArtboard id="system" label="System proposal" width={820} height={1180}>
+              <SystemProposal/>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 1: Before (annotated) ── */}
+          <DCSection id="before" title="Before · annotated" subtitle="The screens as they ship today. Pin numbers link to findings.">
+            <DCArtboard id="b-dash" label="Dashboard · BIG12" width={PHONE_W} height={PHONE_H + 80}>
+              <Annotated pins={[
+                { n: 1, x: 16,  y: 110 },
+                { n: 3, x: 340, y: 260 },
+                { n: 13,x: 16,  y: 220 },
+                { n: 2, x: 320, y: 620 },
+                { n: 15,x: 340, y: 330 },
+              ]}>
+                <BeforeDashboard/>
+              </Annotated>
+            </DCArtboard>
+
+            <DCArtboard id="b-analytics" label="Analytics" width={PHONE_W} height={PHONE_H + 80}>
+              <Annotated pins={[
+                { n: 3, x: 16,  y: 170 },
+                { n: 4, x: 16,  y: 730 },
+                { n: 13,x: 340, y: 430 },
+                { n: 15,x: 340, y: 200 },
+              ]}>
+                <BeforeAnalytics/>
+              </Annotated>
+            </DCArtboard>
+
+            <DCArtboard id="b-standings" label="Standings" width={PHONE_W} height={PHONE_H + 80}>
+              <Annotated pins={[
+                { n: 5, x: 340, y: 280 },
+                { n: 6, x: 300, y: 420 },
+                { n: 7, x: 340, y: 460 },
+              ]}>
+                <BeforeStandings/>
+              </Annotated>
+            </DCArtboard>
+
+            <DCArtboard id="b-intel" label="Intel · across league" width={PHONE_W} height={PHONE_H + 80}>
+              <Annotated pins={[
+                { n: 8, x: 16,  y: 280 },
+                { n: 9, x: 350, y: 220 },
+              ]}>
+                <BeforeIntel/>
+              </Annotated>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 2: After — Dashboard ── */}
+          <DCSection id="after-dash" title="After · Dashboard" subtitle="Lead with this week's moment. Replace import logs with league pulse.">
+            <DCArtboard id="a-dash" label="Week-14 focus" width={PHONE_W} height={PHONE_H}>
+              <AfterDashboard/>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 3: After — Analytics ── */}
+          <DCSection id="after-analytics" title="After · Analytics" subtitle="Insight sentence up top · KPI strip demoted · analytics sections as a scannable directory.">
+            <DCArtboard id="a-analytics" label="Insight-first" width={PHONE_W} height={PHONE_H}>
+              <AfterAnalytics/>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 4: After — Standings ── */}
+          <DCSection id="after-standings" title="After · Standings" subtitle="Each row: rank, avatar, name, PF/PA inline, record, diff, 5-week form sparkline.">
+            <DCArtboard id="a-standings" label="Dense standings" width={PHONE_W} height={PHONE_H}>
+              <AfterStandings/>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 5: After — Intel ── */}
+          <DCSection id="after-intel" title="After · Intel" subtitle="Never ship an empty default. Group by time, left-border tone encodes sentiment.">
+            <DCArtboard id="a-intel" label="Across the league" width={PHONE_W} height={PHONE_H}>
+              <AfterIntel/>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 6: After — AI Chat ── */}
+          <DCSection id="after-chat" title="After · AI Chat" subtitle="Suggestions are grouped by intent and populated with names from YOUR league.">
+            <DCArtboard id="a-chat" label="League-aware prompts" width={PHONE_W} height={PHONE_H}>
+              <AfterAIChat/>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 7: After — Profile ── */}
+          <DCSection id="after-profile" title="After · Profile" subtitle="Career stats across leagues fill the empty real estate. League rows carry rec + years.">
+            <DCArtboard id="a-profile" label="Career profile" width={PHONE_W} height={PHONE_H}>
+              <AfterProfile/>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 8: Today's Briefing — three variations ── */}
+          <DCSection id="briefing" title="Today's Briefing · 3 synthesis styles" subtitle="Intel > My team. AI-synthesized top 3 takeaways for your roster this week. Same data, three voices.">
+            <DCArtboard id="brief-a" label="A · Editorial" width={PHONE_W} height={PHONE_H}>
+              <BriefingEditorial/>
+            </DCArtboard>
+            <DCArtboard id="brief-b" label="B · Scorecard" width={PHONE_W} height={PHONE_H}>
+              <BriefingScorecard/>
+            </DCArtboard>
+            <DCArtboard id="brief-c" label="C · Narrative stream" width={PHONE_W} height={PHONE_H}>
+              <BriefingNarrative/>
+            </DCArtboard>
+          </DCSection>
+
+          {/* ── ROW 9: Player Detail Sheet ── */}
+          <DCSection id="player-sheet" title="Player Detail Sheet" subtitle="Opens from any takeaway or signal card. All signals, AI summary, quick actions.">
+            <DCArtboard id="player-sheet-a" label="Mac Jones · SIT" width={PHONE_W} height={PHONE_H}>
+              <PlayerDetailSheet/>
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
