@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct OnboardingView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -512,6 +513,7 @@ struct YahooConnectStep: View {
     let onDiscover: () async -> Void
 
     @State private var waitingForBrowser = false
+    @State private var authSession: ASWebAuthenticationSession?
 
     private var authURL: URL? {
         var components = URLComponents(string: "https://localhost:3443/api/auth/yahoo")
@@ -615,12 +617,34 @@ struct YahooConnectStep: View {
 
     private func openYahooAuth() {
         guard let authURL else { return }
-        UIApplication.shared.open(authURL) { opened in
+        let session = ASWebAuthenticationSession(
+            url: authURL,
+            callbackURLScheme: "fantasyhub"
+        ) { _, error in
             Task { @MainActor in
-                if opened {
-                    waitingForBrowser = true
+                waitingForBrowser = false
+                if let authError = error as? ASWebAuthenticationSessionError,
+                   authError.code == .canceledLogin {
+                    return
                 }
+                await onCheckStatus()
             }
         }
+        session.prefersEphemeralWebBrowserSession = false
+        session.presentationContextProvider = YahooAuthContextProvider.shared
+        authSession = session
+        waitingForBrowser = true
+        session.start()
+    }
+}
+
+@MainActor
+private final class YahooAuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    static let shared = YahooAuthContextProvider()
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.windows.first ?? ASPresentationAnchor()
     }
 }
