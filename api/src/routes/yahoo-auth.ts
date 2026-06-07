@@ -203,18 +203,8 @@ router.get("/yahoo/callback", async (req, res) => {
       });
     }
 
-    // Return a success page (this is opened in a browser, not an API client)
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head><title>Yahoo Connected</title></head>
-      <body style="font-family: system-ui; text-align: center; padding: 4rem;">
-        <h1>Yahoo Fantasy Connected!</h1>
-        <p>Your Yahoo account has been linked. You can close this window and return to Fantasy Hub.</p>
-        <p style="color: #888; font-size: 0.85rem;">Yahoo ID: ${yahooGuid}</p>
-      </body>
-      </html>
-    `);
+    // Redirect back to the app via custom URL scheme so ASWebAuthenticationSession auto-dismisses
+    res.redirect(`fantasyhub://yahoo/connected?guid=${encodeURIComponent(yahooGuid)}`);
   } catch (err) {
     console.error("Yahoo callback unexpected error:", err);
     res.status(500).send(`
