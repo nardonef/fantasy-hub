@@ -15,6 +15,7 @@ import insightsRoutes from "./routes/insights";
 import chatRoutes from "./routes/chat";
 import feedRoutes from "./routes/feed";
 import playerRoutes from "./routes/players";
+import intelligenceRoutes from "./routes/intelligence";
 import { startSyncWorker } from "./jobs/sync-league";
 import { startIngestionWorker, ingestionQueue } from "./jobs/ingest-signals";
 
@@ -45,6 +46,7 @@ app.use("/api/leagues", activityRoutes);
 app.use("/api/leagues", insightsRoutes);
 app.use("/api/leagues", chatRoutes);
 app.use("/api/leagues", feedRoutes);
+app.use("/api/leagues", intelligenceRoutes);
 app.use("/api/players", playerRoutes);
 app.use("/api/auth", yahooAuthRoutes);
 

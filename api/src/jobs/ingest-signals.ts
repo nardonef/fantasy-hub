@@ -5,6 +5,8 @@ import { resolvePlayer } from "../ingestion/player-resolution";
 import { RedditAdapter } from "../ingestion/adapters/reddit";
 import { FantasyProsAdapter } from "../ingestion/adapters/fantasypros";
 import { SportsdataAdapter } from "../ingestion/adapters/sportsdata";
+import { TwitterAdapter } from "../ingestion/adapters/twitter";
+import { BlueskyAdapter } from "../ingestion/adapters/bluesky";
 import type { IngestionAdapter, RawSignal } from "../ingestion/types";
 import type { Prisma } from "../generated/prisma/client";
 
@@ -20,7 +22,10 @@ function buildAdapters(): void {
   if (process.env.SPORTSDATA_API_KEY) {
     ADAPTERS.push(new SportsdataAdapter(process.env.SPORTSDATA_API_KEY, prisma));
   }
-  // Future: BlueskyAdapter
+  // Twitter via Nitter RSS — degrades gracefully if all instances are unreachable
+  ADAPTERS.push(new TwitterAdapter(prisma));
+  // Bluesky AT Protocol public API — no credentials needed
+  ADAPTERS.push(new BlueskyAdapter(prisma));
 }
 
 export function startIngestionWorker(): void {

@@ -258,6 +258,33 @@ actor APIClient {
         try await request(.get, path: "/leagues/\(leagueId)/recommendations?limit=\(limit)")
     }
 
+    func fetchIntelligence(
+        leagueId: String,
+        weekOpponent: Bool = false,
+        myRosterOnly: Bool = false,
+        limit: Int = 20,
+        cursor: String? = nil
+    ) async throws -> IntelligenceResponse {
+        var params = ["limit=\(limit)"]
+        if weekOpponent { params.append("weekOpponent=true") }
+        if myRosterOnly { params.append("myRosterOnly=true") }
+        if let cursor { params.append("cursor=\(cursor)") }
+        return try await request(.get, path: "/leagues/\(leagueId)/intelligence?\(params.joined(separator: "&"))")
+    }
+
+    func fetchBriefing(leagueId: String) async throws -> TodaysBriefingResponse {
+        try await request(.get, path: "/leagues/\(leagueId)/briefing")
+    }
+
+    func fetchPlayerAISummary(playerId: String, leagueId: String) async throws -> PlayerAISummary {
+        try await request(.get, path: "/leagues/\(leagueId)/players/\(playerId)/ai-summary")
+    }
+
+    func fetchRankingHistory(playerId: String) async throws -> [RankHistoryPoint] {
+        let response: RankingHistoryResponse = try await request(.get, path: "/players/\(playerId)/ranking-history")
+        return response.points
+    }
+
     func searchPlayers(query: String) async throws -> [PlayerSearchResult] {
         guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             return []

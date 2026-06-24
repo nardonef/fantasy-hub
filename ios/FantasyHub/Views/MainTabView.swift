@@ -38,7 +38,7 @@ struct MainTabView: View {
                 AnalyticsView()
                     .tag(Tab.analytics)
 
-                FeedView()
+                IntelView()
                     .tag(Tab.feed)
 
                 ChatLandingView()

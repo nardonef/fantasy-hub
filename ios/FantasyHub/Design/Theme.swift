@@ -20,12 +20,23 @@ enum Theme {
     static let accent = oldGold
     static let accentMuted = mutedGold
 
+    // MARK: - Elevation Surfaces
+    static let bgElev1 = Color(hex: 0x1C1A17)
+    static let bgElev2 = Color(hex: 0x24211D)
+
+    // MARK: - Opacity Scale
+    static let textDim    = warmCream.opacity(0.62)
+    static let textFaint  = warmCream.opacity(0.38)
+    static let hairline         = warmCream.opacity(0.08)
+    static let hairlineStrong   = warmCream.opacity(0.14)
+
     // MARK: - Status Colors
-    static let win = Color(hex: 0x4ADE80)
-    static let loss = Color(hex: 0xF87171)
-    static let tie = Color(hex: 0xFBBF24)
-    static let positive = Color(hex: 0x4ADE80)
-    static let negative = Color(hex: 0xF87171)
+    static let win  = Color(hex: 0x6FBF8A)
+    static let loss = Color(hex: 0xD96B6B)
+    static let tie  = Color(hex: 0xD6B461)
+    static let info = Color(hex: 0x7FA8C9)
+    static let positive = win
+    static let negative = loss
 
     // MARK: - Heatmap & Visual Hierarchy
     static let heatmapEmpty = Color(hex: 0x333333)
@@ -61,6 +72,8 @@ enum Theme {
     static let captionFont: Font = .system(size: 12, weight: .medium, design: .default)
     static let statFont: Font = .system(size: 24, weight: .bold, design: .monospaced)
     static let tabularFont: Font = .system(size: 15, weight: .semibold, design: .monospaced)
+    static let numDisplay: Font = .system(size: 32, weight: .semibold, design: .monospaced)
+    static let numStat: Font = .system(size: 18, weight: .semibold, design: .monospaced)
 
     // MARK: - Spacing
     static let spacingXS: CGFloat = 4
@@ -73,6 +86,7 @@ enum Theme {
     static let radiusSM: CGFloat = 8
     static let radiusMD: CGFloat = 12
     static let radiusLG: CGFloat = 16
+    static let radiusXL: CGFloat = 20
 }
 
 // MARK: - Color Extension
